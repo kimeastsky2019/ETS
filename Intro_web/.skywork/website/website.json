@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "kind": "websiteBinding",
+  "website_id": "019ff25c-9ddd-7e25-a6b2-54738fe702a0",
+  "source_dir": ".",
+  "source_type": "react",
+  "framework": "vite",
+  "manifest_path": ".skywork/website.json",
+  "authority": "bindingHint"
+}
