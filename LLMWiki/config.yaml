@@ -1,0 +1,72 @@
+# LLMWiki 설정
+project:
+  name: "샘플 금융시스템"
+  # 분석 대상 소스 루트 (여러 개 지정 가능)
+  source_roots:
+    - "./sample"
+  # 시스템 구분: 경로 패턴 → 계층명 (뷰어 좌측 트리 1단)
+  layers:
+    - { name: "기관계", match: "**/inst/**" }
+    - { name: "채널계", match: "**/channel/**" }
+    - { name: "공통", match: "**/common/**" }
+
+parse:
+  include: ["**/*.java", "**/*.xml"]
+  exclude: ["**/target/**", "**/build/**", "**/test/**", "**/generated/**"]
+  # LLM 컨텍스트에 넣을 클래스당 최대 문자수 (초과 시 메서드 시그니처만)
+  max_class_chars: 12000
+
+llm:
+  # claude | grok | ollama | template
+  provider: claude
+
+  claude:
+    model: claude-opus-5
+    effort: high          # low | medium | high | xhigh | max
+    max_tokens: 16000
+    concurrency: 4
+
+  grok:
+    # 키는 환경변수 XAI_API_KEY 로만 넣는다 (여기 적지 말 것).
+    # 모델은 XAI_MODEL 로도 덮어쓸 수 있다.
+    model: grok-4.20-0309-non-reasoning
+    max_tokens: 16000
+    temperature: 0.2
+    concurrency: 4
+
+  ollama:
+    base_url: "http://211.119.38.216:11434"
+    model: "hf.co/unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF:Q4_K_M"
+    num_ctx: 32768
+    concurrency: 1
+    # keep_alive: 모델을 메모리에 유지 (0이면 매 호출 재적재 → 매우 느림)
+    keep_alive: "30m"
+
+output:
+  docs_dir: "./docs"
+  index_file: "./docs/index.json"
+  # 산출물 생성 언어. ko | en (환경변수 LLMWIKI_LANG 로 덮어쓰기)
+  # 뷰어 UI 의 초기 언어도 이 값을 따른다.
+  language: ko
+
+# 규제 지식그래프 · 근거기반 자동평가 (llmwiki reg …)
+compliance:
+  # 승인 저널·변경 제안·원문·골드셋이 쌓이는 곳. append-only 라 지우면 복구되지 않는다.
+  dir: "./compliance"
+  # 판정에 적용할 룰셋 버전 (판정 결과에 함께 기록되어 재현의 근거가 된다)
+  ruleset: "1.0.0"
+  standard: "2026.08"
+
+# 문서 지식베이스 (llmwiki kb …)
+kb:
+  # 4채널로 분해해 적재한 문서와 적재 이력(ledger.jsonl)이 쌓이는 곳.
+  # append-only 라 지우면 무엇이 언제 어떤 판정으로 들어왔는지가 사라진다.
+  dir: "./knowledge"
+  # 문서 내용이 실제로 도달하는 곳. 국외 이전 해당성(개인정보보호법 제28조의8)이
+  # 여기서 갈린다. 비워 두면 llm.provider 를 따른다.
+  #   ollama·template = 국내  |  claude·grok = 국외  |  그 밖 = 국외로 간주
+  destination: ""
+
+server:
+  host: "127.0.0.1"
+  port: 8722

@@ -1,0 +1,33 @@
+[project]
+name = "llmwiki"
+version = "0.1.0"
+description = "레거시 소스(Spring+MyBatis)를 AI로 분석해 산출물(MD)을 생성하고 위키로 서비스한다"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.69",
+    "fastapi>=0.115",
+    "python-multipart>=0.0.9",
+    "uvicorn[standard]>=0.32",
+    "httpx>=0.27",
+    "pyyaml>=6.0",
+    "openpyxl>=3.1",
+    "pypdf>=5.0",
+    # 표 격자 인식용. pypdf 는 통짜 텍스트만 줘서 표의 행-열 관계가 깨진다.
+    "pdfplumber>=0.11",
+    "python-frontmatter>=1.1",
+    "typer>=0.15",
+    "rich>=13.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3"]
+
+[project.scripts]
+llmwiki = "llmwiki.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["llmwiki"]
