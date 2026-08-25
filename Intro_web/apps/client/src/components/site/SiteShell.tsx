@@ -7,22 +7,33 @@ import {
   Phone,
   Search,
   ShoppingBag,
+  UserRound,
   X,
 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
+import { useMember } from "@/hooks/useMember";
 
 const publicNav = [
   { to: "/company", label: "회사소개" },
   { to: "/business", label: "사업영역" },
   { to: "/performance", label: "사업실적" },
   { to: "/solar-store", label: "태양광 스토어" },
-  { to: "/media", label: "인사이트" },
+  { to: "/media", label: "블로그·쇼츠" },
+  { to: "/contact", label: "문의하기" },
 ];
 
 export function SiteShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  // 프리렌더된 홈 마크업과 하이드레이션 결과가 어긋나지 않도록,
+  // 로그인 상태에 따라 달라지는 UI 는 마운트 이후에만 그린다.
+  const [mounted, setMounted] = useState(false);
   const location = useLocation();
+  const { isAuthenticated, isStaff, profile } = useMember();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -36,7 +47,12 @@ export function SiteShell({ children }: { children: ReactNode }) {
           <span>에너지수요관리 전문기업 · Energy Technology Service</span>
           <div className="utility-links">
             <a href="tel:0236670404"><Phone size={13} /> 02.3667.0404</a>
-            <Link to="/staff"><Mail size={13} /> 임직원 포털</Link>
+            {mounted && isAuthenticated ? (
+              <Link to="/my"><UserRound size={13} /> {profile?.name ?? "마이페이지"}</Link>
+            ) : (
+              <Link to="/login"><UserRound size={13} /> 로그인·회원가입</Link>
+            )}
+            <Link to={mounted && isStaff ? "/work" : "/work/login"}><Mail size={13} /> 임직원 포털</Link>
           </div>
         </div>
       </div>
@@ -62,12 +78,12 @@ export function SiteShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="header-actions">
-            <Link className="icon-action" to="/staff" aria-label="문서 검색">
+            <Link className="icon-action" to="/media" aria-label="콘텐츠 보기">
               <Search size={18} />
             </Link>
-            <Link className="store-action" to="/solar-store">
+            <Link className="store-action" to="/solar-apply">
               <ShoppingBag size={17} />
-              <span>구매 상담</span>
+              <span>태양광 신청</span>
             </Link>
             <button
               type="button"
@@ -91,8 +107,9 @@ export function SiteShell({ children }: { children: ReactNode }) {
         <nav aria-label="모바일 메뉴">
           <NavLink to="/">홈</NavLink>
           {publicNav.map((item) => <NavLink key={item.to} to={item.to}>{item.label}</NavLink>)}
-          <NavLink to="/staff">임직원 포털</NavLink>
-          <NavLink to="/contact">문의하기</NavLink>
+          <NavLink to="/solar-apply">발코니 태양광 신청</NavLink>
+          <NavLink to={mounted && isAuthenticated ? "/my" : "/login"}>{mounted && isAuthenticated ? "마이페이지" : "로그인·회원가입"}</NavLink>
+          <NavLink to={mounted && isStaff ? "/work" : "/work/login"}>임직원 포털</NavLink>
         </nav>
         <a className="mobile-mail" href="https://mail.naver.com/" target="_blank" rel="noreferrer">
           회사 메일 확인 <ArrowUpRight size={16} />
@@ -115,8 +132,9 @@ export function SiteShell({ children }: { children: ReactNode }) {
           <div>
             <p className="footer-label">QUICK LINKS</p>
             <Link to="/business">사업영역 <ChevronRight size={14} /></Link>
-            <Link to="/solar-store">발코니 태양광 <ChevronRight size={14} /></Link>
-            <Link to="/staff">임직원 문서검색 <ChevronRight size={14} /></Link>
+            <Link to="/solar-apply">발코니 태양광 신청 <ChevronRight size={14} /></Link>
+            <Link to="/media">블로그·쇼츠 <ChevronRight size={14} /></Link>
+            <Link to="/work/login">임직원 포털 <ChevronRight size={14} /></Link>
             <a href="/legacy/index.html">기존 상세자료 <ChevronRight size={14} /></a>
           </div>
         </div>

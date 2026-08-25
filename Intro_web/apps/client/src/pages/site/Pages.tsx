@@ -1,6 +1,9 @@
 import { IMAGES } from "@/assets/images";
+import { SOLAR_PACKAGES } from "@/data/solar-packages";
 import { PageHero, SiteShell } from "@/components/site/SiteShell";
 import { usePageMeta } from "@/lib/use-page-meta";
+import { inquiriesApi } from "@/lib/platform";
+import { toast } from "sonner";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -18,9 +21,7 @@ import {
   Minus,
   PackageCheck,
   Phone,
-  Play,
   Plus,
-  Search,
   ShieldCheck,
   ShoppingBag,
   Sparkles,
@@ -29,39 +30,8 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
-
-type DocumentItem = {
-  title: string;
-  category: "회사" | "사업" | "실적" | "고객자료";
-  summary: string;
-  path: string;
-  keywords: string;
-};
-
-const documents: DocumentItem[] = [
-  { title: "기업소개", category: "회사", summary: "회사 개요, 주요 사업, 면허 및 자격", path: "about.html", keywords: "기업 회사 개요 면허 자격" },
-  { title: "CEO 인사말", category: "회사", summary: "경영 철학과 에너지 효율화 비전", path: "ceo.html", keywords: "대표 CEO 비전 인사말" },
-  { title: "회사연혁", category: "회사", summary: "설립 이후 주요 성장 과정", path: "history.html", keywords: "연혁 설립 역사" },
-  { title: "조직도", category: "회사", summary: "부서 및 전문 인력 구성", path: "org.html", keywords: "조직 부서 담당자" },
-  { title: "사업면허", category: "회사", summary: "보유 면허와 전문 자격", path: "license.html", keywords: "면허 자격 인증" },
-  { title: "에너지 진단", category: "사업", summary: "진단 범위, 절차, 지원 제도", path: "energy-audit.html", keywords: "에너지진단 절감 진단비용" },
-  { title: "ESCO 사업", category: "사업", summary: "에너지절약전문기업 사업과 수행 사례", path: "esco.html", keywords: "ESCO 효율 시설 투자 절감" },
-  { title: "신재생에너지", category: "사업", summary: "태양광·태양열·연료전지 등 사업 안내", path: "renewable.html", keywords: "신재생 태양광 연료전지" },
-  { title: "태양광", category: "사업", summary: "태양광 발전 원리, 구성, 설치 사례", path: "solar.html", keywords: "태양광 패널 인버터 발전소" },
-  { title: "기계설비 성능점검", category: "사업", summary: "기계설비 성능점검 및 공사업", path: "mech.html", keywords: "기계설비 성능점검 공사" },
-  { title: "스마트제조 지원", category: "사업", summary: "스마트제조·ICT 기반 에너지 관리", path: "smart.html", keywords: "스마트공장 제조 ICT" },
-  { title: "데이터바우처", category: "사업", summary: "데이터 분석·가공 공급기업 서비스", path: "voucher.html", keywords: "데이터 바우처 분석 가공" },
-  { title: "디지털 트윈", category: "사업", summary: "에너지 분야 디지털 트윈 적용", path: "twin.html", keywords: "디지털트윈 시뮬레이션 데이터" },
-  { title: "2024년 사업실적", category: "실적", summary: "2024년 주요 프로젝트 수행실적", path: "perf-2024.html", keywords: "2024 실적 프로젝트" },
-  { title: "2023년 사업실적", category: "실적", summary: "2023년 주요 프로젝트 수행실적", path: "perf-2023.html", keywords: "2023 실적 프로젝트" },
-  { title: "2022년 사업실적", category: "실적", summary: "2022년 주요 프로젝트 수행실적", path: "perf-2022.html", keywords: "2022 실적 프로젝트" },
-  { title: "기초자료 조사표", category: "고객자료", summary: "에너지 진단을 위한 기초자료 접수 안내", path: "report.html", keywords: "조사표 양식 제출 팩스" },
-  { title: "공지사항", category: "고객자료", summary: "회사 공지와 주요 안내", path: "notice.html", keywords: "공지 안내" },
-  { title: "뉴스", category: "고객자료", summary: "에너지기술서비스 관련 최신 소식", path: "news.html", keywords: "뉴스 보도 소식" },
-  { title: "자료실", category: "고객자료", summary: "에너지 기술 관련 문서와 자료", path: "archive.html", keywords: "자료 다운로드 문서" },
-];
 
 const services = [
   {
@@ -97,59 +67,6 @@ const services = [
     legacy: "voucher.html",
   },
 ];
-
-type SolarPackage = {
-  id: string;
-  name: string;
-  badge: string;
-  capacity: string;
-  fit: string;
-  includes: string[];
-  lead: string;
-  image: string;
-};
-
-const solarPackages: SolarPackage[] = [
-  {
-    id: "mini",
-    name: "Balcony Mini 400",
-    badge: "1~2인 가구",
-    capacity: "400W급 구성 예시",
-    fit: "작은 발코니 · 입문형",
-    includes: ["모듈 1장 구성", "마이크로 인버터 검토", "설치 환경 사전 확인"],
-    lead: "간결한 구성으로 시작하는 소형 패키지",
-    image: IMAGES.STORE_DOT_BALCONY,
-  },
-  {
-    id: "duo",
-    name: "Balcony Duo 800",
-    badge: "추천",
-    capacity: "800W급 구성 예시",
-    fit: "일반 가정 · 균형형",
-    includes: ["모듈 2장 구성", "발전 모니터링 검토", "맞춤 배치 컨설팅"],
-    lead: "발전량과 설치 면적의 균형을 고려한 상담 패키지",
-    image: IMAGES.BUSINESS_DOT_RENEWABLE,
-  },
-  {
-    id: "smart",
-    name: "Balcony Smart 1200",
-    badge: "확장형",
-    capacity: "1.2kW급 구성 예시",
-    fit: "넓은 발코니 · 고효율형",
-    includes: ["모듈 3장 구성", "스마트 계측 연계 검토", "현장 안전성 검토"],
-    lead: "더 넓은 공간과 데이터 모니터링을 위한 확장 패키지",
-    image: IMAGES.BUSINESS_DOT_DATA,
-  },
-];
-
-const mediaItems = [
-  { id: 1, type: "BLOG", title: "에너지 진단, 어디서부터 시작해야 할까?", summary: "진단 전 준비자료와 현장 체크포인트를 한 번에 정리했습니다.", duration: "5분 읽기", image: IMAGES.MEDIA_DOT_INSIGHT, tag: "에너지진단" },
-  { id: 2, type: "SHORTS", title: "30초로 보는 발코니 태양광 설치 순서", summary: "현장 확인부터 배치·계통 검토까지 핵심 흐름을 짧게 확인하세요.", duration: "00:30", image: IMAGES.STORE_DOT_BALCONY, tag: "태양광" },
-  { id: 3, type: "BLOG", title: "ESCO가 시설 투자 부담을 낮추는 방식", summary: "성과 기반 에너지 효율화 사업의 구조를 실무 관점에서 설명합니다.", duration: "6분 읽기", image: IMAGES.BUSINESS_DOT_ESCO, tag: "ESCO" },
-  { id: 4, type: "SHORTS", title: "우리 건물의 에너지 손실 신호 3가지", summary: "운전시간, 피크부하, 설비 효율에서 확인할 수 있는 징후입니다.", duration: "00:45", image: IMAGES.BUSINESS_DOT_DATA, tag: "효율화" },
-  { id: 5, type: "BLOG", title: "태양광·풍력·연료전지, 현장별 선택 기준", summary: "공간과 부하 패턴, 유지관리 조건에 맞춰 비교하는 방법입니다.", duration: "7분 읽기", image: IMAGES.BUSINESS_DOT_RENEWABLE, tag: "신재생" },
-  { id: 6, type: "SHORTS", title: "데이터로 찾는 전력 피크 절감 포인트", summary: "짧은 데이터 분석으로 먼저 확인할 수 있는 운영 개선 포인트입니다.", duration: "00:40", image: IMAGES.MEDIA_DOT_INSIGHT, tag: "데이터" },
-] as const;
 
 function SectionHeading({ eyebrow, title, description }: { eyebrow: string; title: string; description?: string }) {
   return (
@@ -267,11 +184,11 @@ export function HomePage() {
         <div className="site-container">
           <div className="staff-preview-head">
             <SectionHeading eyebrow="WORK HUB" title="업무에 필요한 것을 더 빠르게." description="회사 메일과 주요 문서를 한 곳에서 찾는 임직원 전용 바로가기입니다." />
-            <Link className="round-link" to="/staff" aria-label="임직원 포털 열기"><ArrowUpRight /></Link>
+            <Link className="round-link" to="/work" aria-label="임직원 업무 포털 열기"><ArrowUpRight /></Link>
           </div>
           <div className="staff-shortcuts">
-            <Link to="/staff"><Mail /><div><strong>회사 메일</strong><span>네이버 메일 바로가기</span></div><ChevronRight /></Link>
-            <Link to="/staff"><FileSearch /><div><strong>문서 검색</strong><span>사업·실적·고객자료 통합검색</span></div><ChevronRight /></Link>
+            <Link to="/work"><Mail /><div><strong>회사 메일</strong><span>네이버 메일 바로가기</span></div><ChevronRight /></Link>
+            <Link to="/work"><FileSearch /><div><strong>문서 검색</strong><span>사업·실적·고객자료 통합검색</span></div><ChevronRight /></Link>
             <a href="/legacy/index.html"><BookOpen /><div><strong>기존 자료실</strong><span>전체 상세 페이지 아카이브</span></div><ChevronRight /></a>
           </div>
         </div>
@@ -400,57 +317,11 @@ export function PerformancePage() {
   );
 }
 
-export function StaffPage() {
-  usePageMeta("임직원 포털", "회사 메일 바로가기와 에너지기술서비스의 사업·실적·고객자료 통합 문서 검색을 제공합니다.");
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<"전체" | DocumentItem["category"]>("전체");
-  const filtered = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    return documents.filter((document) => {
-      const categoryMatch = category === "전체" || document.category === category;
-      const text = `${document.title} ${document.summary} ${document.keywords}`.toLowerCase();
-      return categoryMatch && (!normalized || text.includes(normalized));
-    });
-  }, [category, query]);
-
-  return (
-    <SiteShell>
-      <PageHero eyebrow="EMPLOYEE WORK HUB" title="업무 포털" description="메일 확인과 사내 활용 문서를 한 화면에서 빠르게 찾습니다." compact />
-      <section className="section staff-section">
-        <div className="site-container">
-          <div className="mail-access-card">
-            <div className="mail-icon"><Mail /></div>
-            <div><span className="eyebrow">COMPANY MAIL</span><h2>회사 이메일 확인</h2><p>에너지기술서비스에서 사용 중인 네이버 메일 로그인 화면으로 이동합니다.</p></div>
-            <a className="button primary" href="https://mail.naver.com/" target="_blank" rel="noreferrer">메일 확인 <ArrowUpRight size={16} /></a>
-          </div>
-          <div className="document-search-head">
-            <div><span className="eyebrow">DOCUMENT FINDER</span><h2>문서 통합검색</h2><p>기존 홈페이지의 회사·사업·실적·고객자료를 제목과 키워드로 검색합니다.</p></div>
-            <div className="search-box"><Search size={20} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="예: 에너지진단, 2024 실적, 태양광" />{query && <button type="button" aria-label="검색어 지우기" onClick={() => setQuery("")}><X size={17} /></button>}</div>
-          </div>
-          <div className="category-filters">
-            {(["전체", "회사", "사업", "실적", "고객자료"] as const).map((item) => <button type="button" key={item} className={category === item ? "active" : ""} onClick={() => setCategory(item)}>{item}</button>)}
-          </div>
-          <div className="search-result-meta"><span>{filtered.length}개 문서</span><span>검색 결과는 기존 상세자료로 연결됩니다.</span></div>
-          <div className="document-grid">
-            {filtered.map((document) => (
-              <a href={`/legacy/${document.path}`} key={`${document.category}-${document.title}`}>
-                <div className="doc-top"><span>{document.category}</span><ArrowUpRight size={17} /></div>
-                <FileSearch size={28} /><h3>{document.title}</h3><p>{document.summary}</p>
-              </a>
-            ))}
-            {!filtered.length && <div className="empty-state"><Search /><h3>검색 결과가 없습니다.</h3><p>다른 키워드로 검색하거나 분류를 ‘전체’로 바꿔보세요.</p></div>}
-          </div>
-        </div>
-      </section>
-    </SiteShell>
-  );
-}
-
 export function SolarStorePage() {
   usePageMeta("발코니 태양광 스토어", "발코니 태양광 패키지를 비교하고 장바구니에 담아 맞춤 견적을 요청하세요.");
   const [cart, setCart] = useState<Record<string, number>>({});
   const [cartOpen, setCartOpen] = useState(false);
-  const cartItems = solarPackages.filter((product) => cart[product.id]).map((product) => ({ ...product, quantity: cart[product.id] || 0 }));
+  const cartItems = SOLAR_PACKAGES.filter((product) => cart[product.id]).map((product) => ({ ...product, quantity: cart[product.id] || 0 }));
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
 
   const addToCart = (productId: string) => {
@@ -466,11 +337,11 @@ export function SolarStorePage() {
       return copy;
     });
   };
-  const requestQuote = () => {
-    const lines = cartItems.map((item) => `- ${item.name} × ${item.quantity} (${item.capacity})`).join("\n");
-    const body = `발코니 태양광 맞춤 견적을 요청합니다.\n\n선택 패키지\n${lines}\n\n설치 주소:\n발코니 방향/크기:\n연락처:\n문의사항:`;
-    window.location.href = `mailto:ets0404@naver.com?subject=${encodeURIComponent("[발코니 태양광 견적요청]")}&body=${encodeURIComponent(body)}`;
-  };
+  // 장바구니는 "무엇을 신청할지" 고르는 단계까지만 담당하고,
+  // 실제 접수는 로그인 뒤 신청폼(/solar-apply)에서 DB 로 저장된다.
+  const applyHref = cartItems.length
+    ? `/solar-apply?package=${cartItems[0].id}&qty=${cartItems[0].quantity}`
+    : "/solar-apply";
 
   return (
     <SiteShell>
@@ -479,14 +350,15 @@ export function SolarStorePage() {
         <div className="site-container store-hero-content">
           <span className="eyebrow light">ETS BALCONY SOLAR</span><h1>발코니에서 시작하는<br />우리 집 에너지 전환</h1>
           <p>공간과 사용 패턴에 맞는 구성 예시를 비교하고, 필요한 패키지를 담아 맞춤 견적을 요청하세요.</p>
-          <div className="store-hero-badges"><span><Check /> 패키지 비교</span><span><Check /> 현장 조건 상담</span><span><Check /> 견적 요청</span></div>
+          <div className="store-hero-badges"><span><Check /> 패키지 비교</span><span><Check /> 현장 조건 상담</span><span><Check /> 온라인 설치 신청</span></div>
+          <Link className="button lime" to="/solar-apply">바로 설치 신청 <ArrowRight size={17} /></Link>
         </div>
       </section>
       <section className="section store-section">
         <div className="site-container">
           <div className="store-heading"><SectionHeading eyebrow="SOLAR PACKAGES" title="공간에 맞춘 패키지 구성" description="아래 구성은 상담을 위한 예시이며, 최종 사양·가격·설치 가능 여부는 현장 확인 후 결정됩니다." /><button type="button" className="cart-button" onClick={() => setCartOpen(true)}><ShoppingBag size={19} /> 장바구니 <span>{cartCount}</span></button></div>
           <div className="product-grid">
-            {solarPackages.map((product) => (
+            {SOLAR_PACKAGES.map((product) => (
               <article className="product-card" key={product.id}>
                 <div className="product-image"><img src={product.image} alt={product.name} /><span>{product.badge}</span></div>
                 <div className="product-body">
@@ -518,44 +390,8 @@ export function SolarStorePage() {
           {!cartItems.length && <div className="cart-empty"><ShoppingBag /><h3>담긴 패키지가 없습니다.</h3><p>비교하고 싶은 태양광 구성을 장바구니에 담아보세요.</p></div>}
           {cartItems.map((item) => <div className="cart-item" key={item.id}><img src={item.image} alt="" /><div><strong>{item.name}</strong><span>{item.capacity}</span><div className="quantity"><button type="button" onClick={() => changeQuantity(item.id, -1)}><Minus size={14} /></button><b>{item.quantity}</b><button type="button" onClick={() => changeQuantity(item.id, 1)}><Plus size={14} /></button></div></div></div>)}
         </div>
-        <div className="cart-footer"><p><ShieldCheck size={16} /> 결제 없이 견적 요청 메일만 생성됩니다.</p><button type="button" disabled={!cartItems.length} onClick={requestQuote}>선택 구성으로 견적 요청 <ArrowRight size={17} /></button></div>
+        <div className="cart-footer"><p><ShieldCheck size={16} /> 결제는 없습니다. 신청 후 현장 조건을 확인해 견적을 안내합니다.</p><Link className={cartItems.length ? "cart-apply" : "cart-apply disabled"} to={applyHref} aria-disabled={!cartItems.length}>선택 구성으로 설치 신청 <ArrowRight size={17} /></Link></div>
       </aside>
-    </SiteShell>
-  );
-}
-
-export function MediaPage() {
-  usePageMeta("에너지 인사이트", "에너지진단, ESCO, 신재생에너지와 발코니 태양광 관련 블로그·쇼츠 콘텐츠를 확인하세요.");
-  const [filter, setFilter] = useState<"ALL" | "BLOG" | "SHORTS">("ALL");
-  const [selected, setSelected] = useState<(typeof mediaItems)[number] | null>(null);
-  const visible = mediaItems.filter((item) => filter === "ALL" || item.type === filter);
-
-  return (
-    <SiteShell>
-      <PageHero eyebrow="ENERGY CONTENT HUB" title="블로그 & 쇼츠" description="복잡한 에너지 기술을 더 짧고 명확하게. 실무 인사이트에서 제품 선택 가이드까지 한곳에 모았습니다." image={IMAGES.MEDIA_DOT_INSIGHT} />
-      <section className="section media-section">
-        <div className="site-container">
-          <div className="media-controls"><SectionHeading eyebrow="LATEST INSIGHT" title="쉽게 이해하고, 바로 활용하세요." /><div className="media-filter">{(["ALL", "BLOG", "SHORTS"] as const).map((item) => <button type="button" key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item === "ALL" ? "전체" : item === "BLOG" ? "블로그" : "쇼츠"}</button>)}</div></div>
-          <div className="media-grid">
-            {visible.map((item) => (
-              <button type="button" className={item.type === "SHORTS" ? "media-card vertical" : "media-card"} key={item.id} onClick={() => setSelected(item)}>
-                <div className="media-image"><img src={item.image} alt="" />{item.type === "SHORTS" && <span className="play"><Play fill="currentColor" /></span>}<span className="media-type">{item.type}</span></div>
-                <div className="media-body"><div><span>{item.tag}</span><span>{item.duration}</span></div><h2>{item.title}</h2><p>{item.summary}</p><span className="read-more">콘텐츠 보기 <ArrowUpRight size={15} /></span></div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className="section media-commerce"><div className="site-container"><div><span className="eyebrow light">FROM CONTENT TO ACTION</span><h2>알아본 태양광 솔루션을<br />바로 비교해 보세요.</h2><p>콘텐츠에서 확인한 설치 포인트를 바탕으로 패키지를 비교하고 맞춤 견적을 요청할 수 있습니다.</p></div><Link className="button lime" to="/solar-store">태양광 스토어 <ArrowRight size={17} /></Link></div></section>
-      {selected && (
-        <div className="content-modal" role="dialog" aria-modal="true" aria-label={selected.title}>
-          <button type="button" className="modal-backdrop" onClick={() => setSelected(null)} aria-label="닫기" />
-          <article>
-            <button type="button" className="modal-close" onClick={() => setSelected(null)} aria-label="닫기"><X /></button><img src={selected.image} alt="" />
-            <div className="modal-copy"><span>{selected.type} · {selected.tag}</span><h2>{selected.title}</h2><p>{selected.summary}</p><div className="summary-steps"><div><b>01</b><p>현재 에너지 사용과 설치 환경을 먼저 확인합니다.</p></div><div><b>02</b><p>효과, 안전, 운영 조건을 함께 비교합니다.</p></div><div><b>03</b><p>현장에 맞는 실행안과 견적을 구체화합니다.</p></div></div><Link className="button primary" to="/contact">전문가에게 문의 <ArrowRight size={16} /></Link></div>
-          </article>
-        </div>
-      )}
     </SiteShell>
   );
 }
@@ -563,12 +399,33 @@ export function MediaPage() {
 export function ContactPage() {
   usePageMeta("문의하기", "에너지진단, ESCO, 신재생에너지, 발코니 태양광 구매 및 사업제휴 문의를 접수하세요.");
   const [sent, setSent] = useState(false);
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const [submitting, setSubmitting] = useState(false);
+
+  // 메일 클라이언트를 여는 대신 접수 DB 로 저장한다 → 임직원 포털의 처리 큐로 이어진다.
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const body = `문의유형: ${data.get("type")}\n성명: ${data.get("name")}\n회사명: ${data.get("company")}\n연락처: ${data.get("phone")}\n이메일: ${data.get("email")}\n\n문의내용:\n${data.get("message")}`;
-    setSent(true);
-    window.location.href = `mailto:ets0404@naver.com?subject=${encodeURIComponent(`[홈페이지 문의] ${String(data.get("type"))}`)}&body=${encodeURIComponent(body)}`;
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setSubmitting(true);
+
+    try {
+      await inquiriesApi.create({
+        type: String(data.get("type") ?? "기타"),
+        name: String(data.get("name") ?? ""),
+        company: String(data.get("company") ?? ""),
+        phone: String(data.get("phone") ?? ""),
+        email: String(data.get("email") ?? ""),
+        message: String(data.get("message") ?? ""),
+        privacyAgreed: true
+      });
+      setSent(true);
+      form.reset();
+      toast.success("문의가 접수되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "문의 접수에 실패했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -596,8 +453,8 @@ export function ContactPage() {
               <label className="wide">문의내용<textarea name="message" required placeholder="검토 중인 현장과 필요한 내용을 알려주세요." /></label>
             </div>
             <label className="agree-check"><input type="checkbox" required /> 문의 응대를 위한 개인정보 수집·이용에 동의합니다.</label>
-            <button className="button primary" type="submit">메일로 문의하기 <ArrowRight size={17} /></button>
-            {sent && <p className="form-status"><CircleCheck size={17} /> 메일 앱을 열어 문의 내용을 전송해 주세요.</p>}
+            <button className="button primary" type="submit" disabled={submitting}>{submitting ? "접수 중…" : "문의 접수하기"} <ArrowRight size={17} /></button>
+            {sent && <p className="form-status"><CircleCheck size={17} /> 문의가 접수되었습니다. 담당자가 확인 후 연락드립니다.</p>}
           </form>
         </div>
       </section>

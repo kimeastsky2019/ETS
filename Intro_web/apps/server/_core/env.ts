@@ -40,7 +40,13 @@ export const env = {
   SKYWORK_AI_BASE_URL: readEnv(process.env.SKYWORK_AI_BASE_URL) ?? "https://api.skywork.ai/skycowork-llm/",
   GOOGLE_CLIENT_ID:
     readEnv(process.env.GOOGLE_CLIENT_ID, process.env.VITE_GOOGLE_CLIENT_ID, viteEnv.VITE_GOOGLE_CLIENT_ID) ?? "",
-  GOOGLE_CLIENT_SECRET: readEnv(process.env.GOOGLE_CLIENT_SECRET) ?? ""
+  GOOGLE_CLIENT_SECRET: readEnv(process.env.GOOGLE_CLIENT_SECRET) ?? "",
+  // ETS 통합 플랫폼: 임직원 계정(ets00~ets09, admin) 최초 1회 생성에만 쓰인다.
+  // 기본값을 두지 않는다 — 이 저장소는 공개이고, 코드에 박힌 비밀번호는
+  // 주입을 잊은 배포본을 그대로 열어 준다. 비어 있으면 부트스트랩이 거부한다.
+  STAFF_DEFAULT_PASSWORD: readEnv(process.env.STAFF_DEFAULT_PASSWORD) ?? "",
+  STAFF_ADMIN_PASSWORD: readEnv(process.env.STAFF_ADMIN_PASSWORD) ?? "",
+  STAFF_EMAIL_DOMAIN: readEnv(process.env.STAFF_EMAIL_DOMAIN) ?? "ets.co.kr"
 };
 
 function readCliPort(argv: string[]) {
