@@ -67,6 +67,17 @@ kb:
   #   ollama·template = 국내  |  claude·grok = 국외  |  그 밖 = 국외로 간주
   destination: ""
 
+# 에너지 진단 위키 (llmwiki wiki …)
+wiki:
+  # 마크다운 위키가 사는 곳. 여기가 Single Source of Truth 다 (P1).
+  # 인덱스·검색·그래프는 전부 여기서 재생성하고, 반대 방향으로는 쓰지 않는다.
+  dir: "./wiki"
+  # front-matter 의 provenance.pipeline_version 에 박히는 값.
+  # 생성 규칙을 고치면 함께 올린다 — 안 올리면 어떤 페이지가 어느 규칙 산물인지 모른다.
+  pipeline_version: "v0.1.0"
+  # 페이지 기본 소유 조직 (front-matter 의 owner)
+  owner: "energy-team"
+
 server:
   host: "127.0.0.1"
   port: 8722

@@ -31,7 +31,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import classify, gate, ontology, parse, taxonomy
+from . import classify, gate, ontology, parse, sources, taxonomy
 
 #: 마스킹으로 해소되지 **않는** 위반. 값을 토큰으로 바꾸는 것만으로는 처리 근거가
 #: 생기지 않는 항목이라, 여기 걸리면 마스킹해도 적재 불가다.
@@ -132,7 +132,9 @@ def analyze(
     lang: str = "ko",
 ) -> AnalysisResult:
     """문서 1건을 분석한다. 적재는 하지 않는다 — 화면의 '검토' 단계가 부르는 경로다."""
-    doc = parse.parse_pdf(pdf_path)
+    # PDF 만이 아니다 — 엑셀(계측 데이터)과 이미지(명판·현장 사진)도 같은
+    # ParsedDocument 로 들어온다. 형식 분기는 sources 가 끝낸다.
+    doc = sources.parse_document(pdf_path)
     cls = classify.manual(sector_override) if sector_override else classify.classify_document(doc)
     cov = classify.metric_coverage(doc, cls.sector, lang)
 

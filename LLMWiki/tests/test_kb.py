@@ -608,3 +608,118 @@ def test_preview_hides_what_the_gate_blocked():
     raw = kb_ingest._build_preview(doc, mask=False)
     assert raw["masked"] is False
     assert "010-1234-5678" in raw["text"][0]["content"]
+
+
+# --------------------------------------------------------------------------- #
+# 입력 형식 — PDF · 엑셀 · 이미지가 같은 ParsedDocument 로 들어온다
+# --------------------------------------------------------------------------- #
+def _workbook(path, sheets: dict[str, list[list]]):
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    wb.remove(wb.active)
+    for name, rows in sheets.items():
+        ws = wb.create_sheet(title=name)
+        for row in rows:
+            ws.append(row)
+    wb.save(path)
+    return str(path)
+
+
+def test_unknown_suffix_is_rejected_not_guessed():
+    """확장자를 짐작하면 엑셀이 PDF 파서로 들어가 스택트레이스가 난다."""
+    from llmwiki.kb import sources
+
+    with pytest.raises(parse.ParseError):
+        sources.kind_of("보고서.docx")
+    assert sources.kind_of("계측.XLSX") == "sheet"
+    assert sources.kind_of("명판.JPG") == "image"
+
+
+def test_spreadsheet_splits_blocks_on_blank_rows(tmp_path):
+    """한 시트에 표가 둘이면 둘로 읽어야 한다. 통째로 묶으면 헤더가 엉뚱한 줄이 된다."""
+    from llmwiki.kb import sources
+
+    path = _workbook(tmp_path / "계측.xlsx", {
+        "측정": [
+            ["기번", "측정전력(kW)", "부하율(%)"],
+            ["#1", 25.7, 117],
+            ["#3", 23.0, 105],
+            [],
+            ["구분", "연간 전력량(kWh/y)"],
+            ["2차 숙성실", 2664576],
+        ],
+    })
+    doc = sources.parse_spreadsheet(path)
+    assert doc.n_pages == 1
+    assert len(doc.tables) == 2
+    assert doc.tables[0].header[0] == "기번"
+    assert doc.tables[1].header[1] == "연간 전력량(kWh/y)"
+    assert doc.tables[0].caption == "측정"
+    assert doc.n_numeric_cells >= 5
+
+
+def test_spreadsheet_drops_layout_padding_columns(tmp_path):
+    """서식용 빈 열이 남으면 헤더가 `['', '', '항목']` 이 되어 열 이름 탐색이 헛돈다."""
+    from llmwiki.kb import sources
+
+    path = _workbook(tmp_path / "여백.xlsx", {
+        "표": [["", "", "항목", "값"], ["", "", "용량", "22kW"]],
+    })
+    doc = sources.parse_spreadsheet(path)
+    assert doc.tables[0].header == ["항목", "값"]
+
+
+def test_spreadsheet_feeds_the_same_pipeline_as_pdf(tmp_path):
+    """업종 분류·게이트·온톨로지는 형식을 모른다 — 같은 ParsedDocument 만 본다."""
+    from llmwiki.kb import sources
+
+    path = _workbook(tmp_path / "폐기물.xlsx", {
+        "진단": [
+            ["항목", "값"],
+            ["음식물 폐기물 처리량", "48톤/일"],
+            ["함수율", "80%"],
+            ["루츠블로워 소비전력", "25.7kW"],
+        ],
+    })
+    doc = sources.parse_document(path)
+    cls = classify.classify_document(doc)
+    assert cls.sector == "waste"
+    assert parse.to_chunks(doc), "채널 청크가 나와야 적재된다"
+
+
+def test_broken_file_says_what_failed(tmp_path):
+    """확장자는 맞는데 내용이 깨진 경우 — 스택트레이스가 아니라 문장을 돌려준다."""
+    from llmwiki.kb import sources
+
+    path = tmp_path / "깨진.xlsx"
+    path.write_bytes(b"not a workbook")
+    with pytest.raises(parse.ParseError) as exc:
+        sources.parse_document(str(path))
+    assert "깨진.xlsx" in str(exc.value)
+
+
+def test_image_without_ocr_says_it_could_not_read(tmp_path):
+    """빈 결과를 주면 '아무것도 없는 사진' 과 '읽지 못했다' 가 구분되지 않는다."""
+    from PIL import Image
+
+    from llmwiki.kb import sources
+
+    path = tmp_path / "명판.png"
+    Image.new("RGB", (400, 300), "white").save(path)
+    doc = sources.parse_document(str(path))
+
+    assert doc.n_pages == 1
+    assert len(doc.images) == 1 and doc.images[0].width == 400
+    if not sources.ocr_ready()["ok"]:
+        assert any("읽지 못했다" in w for w in doc.warnings)
+
+
+def test_readiness_reports_each_format_separately():
+    """이미지 OCR 만 빠진 상태는 정상이다. 전체를 실패로 칠하면 PDF 경로까지 막힌 것처럼 보인다."""
+    from llmwiki.kb import sources
+
+    r = sources.readiness()
+    assert r["pdf"]["ok"] and r["sheet"]["ok"]
+    assert set(r["image"]) >= {"ok", "reason", "hint"}
+    assert ".xlsx" in r["suffixes"] and ".png" in r["suffixes"]

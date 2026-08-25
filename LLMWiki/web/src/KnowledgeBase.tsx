@@ -12,6 +12,8 @@ import {
   type KbStats,
 } from "./api";
 import { useLang, type StringKey } from "./i18n";
+import { useLlmChoice } from "./llmChoice";
+import { useFileDrop } from "./useFileDrop";
 
 export type KbTab = "analyze" | "documents" | "search";
 
@@ -67,9 +69,11 @@ const IMAGE_KIND_KEY: Record<string, StringKey> = {
 export default function KnowledgeBase({
   tab,
   onTab,
+  onNavigate,
 }: {
   tab: KbTab;
   onTab: (t: KbTab) => void;
+  onNavigate: (path: string) => void;
 }) {
   const { t } = useLang();
   const [health, setHealth] = useState<KbHealth | null>(null);
@@ -79,7 +83,9 @@ export default function KnowledgeBase({
   const [refresh, setRefresh] = useState(0);
   // 이 문서를 보낼 LLM. 국외 이전 해당성이 여기서 갈리므로 분석 탭이 아니라 화면
   // 전체가 들고 있는다 — 머리말의 '도달하는 곳' 이 선택과 따로 놀면 안 된다.
-  const [provider, setProvider] = useState("");
+  // 공급자 선택은 이 화면이 아니라 **보고서 지식화 솔루션 전체**의 것이다.
+  // 적재와 위키 초안 제안이 각자 들고 있으면 한쪽만 사외로 나간다.
+  const [provider, setProvider] = useLlmChoice();
 
   useEffect(() => {
     api.kb
@@ -88,15 +94,23 @@ export default function KnowledgeBase({
         setHealth(h);
         // 서버 기본값이 고를 수 있는 값이면 그대로 둔다. 화면이 임의로 다른 값을
         // 띄우면 아무것도 안 골랐을 때의 판정 기준과 표시가 어긋난다.
+        //
+        // 다만 사용자가 이미 고른 값이 있으면 건드리지 않는다. 이 선택은 이 화면이
+        // 아니라 솔루션 전체의 것이라, 여기서 덮어쓰면 화면을 옮길 때마다 사내로
+        // 되돌아간다 — 골랐다고 믿는 사용자와 실제 경로가 어긋난다.
         const fallback = h.destinations[0]?.provider ?? "";
-        setProvider(
-          h.destinations.some((d) => d.provider === h.destination.provider)
-            ? h.destination.provider
-            : fallback
-        );
+        const known = h.destinations.some((d) => d.provider === provider);
+        if (!known) {
+          setProvider(
+            h.destinations.some((d) => d.provider === h.destination.provider)
+              ? h.destination.provider
+              : fallback
+          );
+        }
       })
       .catch((e) => setErr(e.message));
     api.kb.sectors().then((r) => setSectors(r.sectors)).catch((e) => setErr(e.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 표시도 판정도 같은 한 줄에서 나온다.
@@ -113,6 +127,15 @@ export default function KnowledgeBase({
       <div className="banner warn kb-notice">
         {t("kbPriorNotice")} <span className="muted small">{t("kbPriorNoticeLaw")}</span>
       </div>
+
+      {/* 이미지 OCR 만 빠진 상태는 고장이 아니다 — 그래서 빨간 배너가 아니라 주의로
+          알린다. 올리고 나서 '아무것도 없음' 을 보면 파일이 빈 것인지 도구가 없는
+          것인지 알 수 없다. */}
+      {health?.parser_ready.formats && !health.parser_ready.formats.image.ok && (
+        <div className="banner warn small">
+          {t("kbImageOcrOff")} <span className="muted">{health.parser_ready.formats.image.reason}</span>
+        </div>
+      )}
 
       {health && !health.parser_ready.ok && (
         <div className="banner error">
@@ -160,8 +183,10 @@ export default function KnowledgeBase({
           provider={provider}
           onProvider={setProvider}
           ready={health?.parser_ready.ok !== false}
+          accept={(health?.parser_ready.formats?.suffixes ?? [".pdf"]).join(",")}
           onError={setErr}
           onIngested={() => setRefresh((n) => n + 1)}
+          onNavigate={onNavigate}
         />
       )}
       {tab === "documents" && (
@@ -179,18 +204,22 @@ function AnalyzeTab({
   sectors,
   destinations,
   provider,
+  accept,
   onProvider,
   ready,
   onError,
   onIngested,
+  onNavigate,
 }: {
   sectors: KbSector[];
   destinations: KbDestination[];
   provider: string;
+  accept: string;
   onProvider: (p: string) => void;
   ready: boolean;
   onError: (e: string | null) => void;
   onIngested: () => void;
+  onNavigate: (path: string) => void;
 }) {
   const { t } = useLang();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -222,19 +251,45 @@ function AnalyzeTab({
     [file, sector, provider, onError, onIngested]
   );
 
+  // 끌어다 놓기. 받지 않는 형식은 그 자리에서 말한다 — '분석하기' 를 누른 뒤에야
+  // 서버가 400 을 주면 사용자는 무엇을 잘못했는지 모른다.
+  const { isOver, dropProps } = useFileDrop({
+    accept,
+    disabled: busy !== null,
+    onFile: (f) => {
+      setFile(f);
+      setResult(null);
+      onError(null);
+    },
+    onReject: (message) => {
+      const [head, tail] = message.split(":");
+      onError(
+        /^\d+$/.test(head)
+          ? t("kbDropMultiple", { n: head, name: tail })
+          : t("kbDropReject", { got: message.split(" · ")[0], allowed: accept })
+      );
+    },
+  });
+
   return (
     <>
       <div className="kb-input">
         <button
-          className={`kb-drop ${file ? "picked" : ""}`}
+          className={`kb-drop ${file ? "picked" : ""} ${isOver ? "dropping" : ""}`}
           onClick={() => fileRef.current?.click()}
+          {...dropProps}
         >
-          <span className="kb-drop-icon">📄</span>
-          <span>{file ? file.name : t("kbPickFile")}</span>
+          <span className="kb-drop-icon">{isOver ? "📥" : "📄"}</span>
+          <span>{isOver ? t("kbDropHere") : file ? file.name : t("kbPickFile")}</span>
+          <span className="kb-drop-formats">
+            {t("kbFormats")} · {t("kbDropHint")}
+          </span>
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf"
+            // 목록은 서버(`parser_ready.formats.suffixes`)가 원본이다. 화면이 따로
+            // 들고 있으면 형식이 늘었을 때 여기만 낡아 파일 선택창이 막는다.
+            accept={accept}
             hidden
             onChange={(e) => {
               setFile(e.target.files?.[0] ?? null);
@@ -299,6 +354,19 @@ function AnalyzeTab({
           <Summary result={result} />
           <GateBanner result={result} />
           {result.stored && <StoredBanner result={result} />}
+          {/* 적재만 하고 끝내는 사람이 많다 — KB 에 들어간 것과 위키 페이지가 선
+              것은 다르다. 그래서 다음 걸음을 화면이 먼저 말한다. */}
+          {result.stored?.stored && (
+            <div className="banner next-step">
+              <div>
+                <strong>{t("kbNextTitle")}</strong>
+                <p className="muted small">{t("kbNextDesc")}</p>
+              </div>
+              <button className="primary" onClick={() => onNavigate("/admin")}>
+                {t("kbGoAdmin")}
+              </button>
+            </div>
+          )}
 
           <div className="reg-tabs kb-detail-tabs" role="tablist">
             {DETAIL_TABS.map((key) => (

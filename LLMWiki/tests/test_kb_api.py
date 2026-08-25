@@ -69,7 +69,10 @@ def test_health_reports_destination_and_parser(client):
     assert h["status"] == "ok"
     assert h["channels"] == ["text", "table", "image", "excel"]
     assert h["destination"]["cross_border"] is False       # config 가 ollama 를 가리킨다
-    assert set(h["parser_ready"]) == {"ok", "reason", "hint"}
+    assert {"ok", "reason", "hint", "formats"} <= set(h["parser_ready"])
+    # 형식별 준비 상태가 따로 나와야 한다 — 이미지 OCR 만 빠진 상태는 정상적으로
+    # 있을 수 있고, 그걸 전체 실패로 칠하면 멀쩡한 PDF 경로까지 막힌 것처럼 보인다.
+    assert {"pdf", "sheet", "image"} <= set(h["parser_ready"]["formats"])
 
 
 def test_sectors_are_the_closed_set(client):
@@ -133,10 +136,19 @@ def test_gate_endpoints_reject_empty_input(client):
 # --------------------------------------------------------------------------- #
 # 업로드 검증
 # --------------------------------------------------------------------------- #
-def test_only_pdf_is_accepted(client):
-    r = client.post("/api/kb/analyze", files={"file": ("보고서.docx", b"x", "application/msword")})
+def test_supported_formats_are_a_closed_set(client):
+    """PDF·엑셀·이미지는 받고 그 밖은 막는다. 목록의 원본은 `kb/sources.py` 하나다."""
+    r = client.post("/api/kb/analyze",
+                    files={"file": ("보고서.docx", b"x", "application/msword")})
     assert r.status_code == 400
-    assert "PDF" in r.json()["detail"]
+    detail = r.json()["detail"]
+    assert ".docx" in detail and ".xlsx" in detail
+
+    # 확장자는 통과하고 내용이 깨진 경우는 다른 오류다 — 형식 거부(400)와 구분된다.
+    broken = client.post("/api/kb/analyze",
+                         files={"file": ("계측.xlsx", b"not a workbook",
+                                         "application/vnd.ms-excel")})
+    assert broken.status_code != 400 or ".xlsx" not in broken.json().get("detail", "")
 
 
 def test_empty_file_is_rejected(client):

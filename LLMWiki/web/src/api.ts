@@ -61,6 +61,15 @@ export interface Readiness {
   detail: string;
 }
 
+/** 형식별 준비 상태. 이미지 OCR 만 빠진 상태는 정상적으로 있을 수 있어 따로 알린다. */
+export interface FormatReadiness {
+  pdf: { ok: boolean; reason: string; hint: string };
+  sheet: { ok: boolean; reason: string; hint: string };
+  image: { ok: boolean; reason: string; hint: string; version?: string; languages?: string[] };
+  /** 업로드가 받아들이는 확장자. 화면이 목록을 따로 들지 않게 서버가 준다. */
+  suffixes: string[];
+}
+
 export interface ProviderInfo {
   id: string;
   model: string;
@@ -567,7 +576,7 @@ export interface KbHealth {
   channels: string[];
   sectors: number;
   /** pdfplumber 가 없으면 업로드하기 전에 알려 준다 */
-  parser_ready: Readiness;
+  parser_ready: Readiness & { formats?: FormatReadiness };
   /** 서버 설정이 정한 기본 목적지 (config.yaml 의 kb.destination → llm.provider) */
   destination: KbDestination;
   /** 화면에서 고를 수 있는 공급자. 목록의 유일한 출처다 — 화면이 따로 들고 있으면
@@ -757,6 +766,276 @@ export interface KbHit {
   snippet: string;
 }
 
+
+// --- 엔진 레이어 (/api/engines) --------------------------------------------- #
+export type EngineStatus = "ok" | "idle" | "unavailable";
+
+export interface EngineInfo {
+  code: string;
+  provider: string;
+  status: EngineStatus;
+  detail: {
+    model?: string;
+    base_url?: string;
+    configured?: boolean;
+    reason?: string;
+    hint?: string;
+    wiki_pages?: number;
+    wiki_terms?: number;
+    kb_documents?: number;
+    kb_records?: number;
+    rrf_k?: number;
+    nodes?: number;
+    ruleset?: string;
+    standard?: string;
+    journal_records?: number;
+    destination?: string;
+    cross_border?: boolean;
+  };
+}
+
+export interface EnginesResponse {
+  engines: EngineInfo[];
+  default_provider: string;
+  routing: {
+    internal_only_acl: string[];
+    examples: {
+      task: string;
+      acl: string;
+      tier: string;
+      provider: string;
+      external_allowed: boolean;
+      reason: string;
+    }[];
+  };
+  checked_at: string;
+  cached: boolean;
+}
+
+// --- 에너지 진단 위키 (/api/wiki) ------------------------------------------- #
+export type WikiAcl = "public" | "internal" | "confidential" | "restricted";
+export type WikiStatus = "draft" | "reviewed" | "deprecated";
+
+export interface WikiSpan {
+  doc: string;
+  pages: number[];
+  section?: string;
+  anchor?: string;
+}
+
+export interface WikiPageSummary {
+  stable_id: string;
+  type: string;
+  title: string;
+  acl: WikiAcl;
+  status: WikiStatus;
+  version: number;
+  numeric_verified: boolean;
+  owner: string;
+  domain: string;
+  measurement_basis: string;
+  confidence: string;
+  tags: string[];
+  related: string[];
+  source_span: WikiSpan[];
+  updated_at: string;
+  path: string;
+}
+
+export interface WikiFinding {
+  code: string;
+  severity: "blocker" | "error" | "warning" | "info";
+  page: string;
+  message: string;
+  hint: string;
+  detail: Record<string, unknown>;
+}
+
+export interface WikiJournalRow {
+  at: string;
+  stable_id: string;
+  type: string;
+  version: number;
+  decision: string;
+  status: WikiStatus;
+  actor: string;
+  note: string;
+  acknowledged_unverified: boolean;
+  numeric_verified: boolean;
+  findings: string[];
+}
+
+export interface WikiPageDetail {
+  page: WikiPageSummary & {
+    front_matter: Record<string, unknown>;
+    body: string;
+    raw: string;
+  };
+  backlinks: WikiPageSummary[];
+  findings: WikiFinding[];
+  review: WikiJournalRow[];
+}
+
+export interface WikiLint {
+  pages: number;
+  deployable: boolean;
+  clean: boolean;
+  counts: Record<string, number>;
+  total: number;
+  findings: WikiFinding[];
+}
+
+export interface WikiStats {
+  pages: number;
+  by_type: Record<string, number>;
+  by_status: Record<string, number>;
+  by_acl: Record<string, number>;
+  numeric_verified: number;
+  broken_pages: number;
+}
+
+export interface WikiFactor {
+  code: string;
+  label: string;
+  value: number;
+  unit: string;
+  valid_from: string;
+  valid_until: string;
+  basis: string;
+  source: string;
+  dimension: string;
+  mislabeled_as: string;
+  expires_in_days: number | null;
+}
+
+export interface WikiReviewStats {
+  records: number;
+  by_decision: Record<string, number>;
+  reviewers: Record<string, number>;
+  acknowledged_unverified: number;
+  last_at: string;
+}
+
+export interface WikiHealth {
+  status: string;
+  contract: string;
+  pipeline_version: string;
+  root: string;
+  store: WikiStats;
+  units: { version: string; standard: string; expiring: WikiFactor[] };
+  lint: Omit<WikiLint, "findings">;
+  parser_ready: { ok: boolean; reason: string; hint: string; formats?: FormatReadiness };
+  destination: { name: string; cross_border: boolean; note: string };
+  review: WikiReviewStats;
+}
+
+export interface WikiCheck {
+  label: string;
+  stated: number | null;
+  computed: number;
+  unit: string;
+  formula: string;
+  inputs: Record<string, unknown>;
+  source: string;
+  ok: boolean;
+  delta_pct: number | null;
+  note: string;
+}
+
+export interface WikiBuildResult {
+  analysis: KbAnalysis;
+  gate_allowed: boolean;
+  summary: {
+    pages: number;
+    by_type: Record<string, number>;
+    site_key: string;
+    period: string;
+    warnings: string[];
+    verified_pages: number;
+    extraction: Record<string, number | string | boolean | null>;
+  };
+  warnings: string[];
+  checks: WikiCheck[];
+  checks_failed: WikiCheck[];
+  pages: WikiPageSummary[];
+  stored: boolean;
+  skipped?: string;
+  lint?: Omit<WikiLint, "findings">;
+}
+
+export interface WikiHit {
+  stable_id: string;
+  title: string;
+  type: string;
+  acl: WikiAcl;
+  status: WikiStatus;
+  numeric_verified: boolean;
+  score: number;
+  ranks: Record<string, number>;
+  snippet: string;
+}
+
+export interface WikiQueueItem {
+  stable_id: string;
+  type: string;
+  title: string;
+  status: WikiStatus;
+  acl: WikiAcl;
+  numeric_verified: boolean;
+  priority: number;
+  reasons: string[];
+  blocking: string[];
+  findings: WikiFinding[];
+}
+
+export interface WikiSuggestion {
+  stable_id: string;
+  task: string;
+  /** 실제로 탄 경로 */
+  provider: string;
+  /** 화면이 고른 경로. provider 와 다르면 등급이 끼어든 것이다. */
+  requested: string;
+  overridden: boolean;
+  external: boolean;
+  text: string;
+  decision: { tier: string; reason: string; external_allowed: boolean };
+  invented_numbers: string[];
+  numeric_clean: boolean;
+  warnings: string[];
+}
+
+/** 재분석 결과. 제안일 뿐이고, 반영은 `applyBody` 가 따로 한다. */
+export interface WikiReanalysis extends WikiSuggestion {
+  current_body: string;
+  context_chars: number;
+  context_pages: number[];
+  decision: {
+    tier: string;
+    reason: string;
+    external_allowed: boolean;
+    structure_kept?: boolean;
+  };
+}
+
+export interface WikiLogRow {
+  at: string;
+  action: string;
+  stable_id: string;
+  type: string;
+  version: number;
+  status: string;
+  acl: string;
+  actor: string;
+  note: string;
+}
+
+export interface WikiTypeInfo {
+  name: string;
+  ko: string;
+  en: string;
+  prefix: string;
+}
+
 /** 서버 오류 메시지도 뷰어 언어를 따르도록 모든 요청에 lang 을 붙인다.
  *  프로젝트도 마찬가지 — 서버에 상태를 두지 않으면 탭을 여러 개 열어도 안 꼬인다. */
 let currentLang: Lang = "ko";
@@ -797,6 +1076,87 @@ function post<T>(url: string, payload?: unknown): Promise<T> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload ?? {}),
   });
+}
+
+
+/* ── 진단 준비 (체크리스트 · 시계열) ─────────────────────────────────── */
+
+export interface ChecklistItem {
+  id: string;
+  name: string;
+  source: string;
+  checked: string;
+  note: string;
+}
+
+export interface ChecklistGroup {
+  equipment: string;
+  fields: string[];
+  items: ChecklistItem[];
+}
+
+export interface ChecklistDraft {
+  sector: string;
+  sector_name: string;
+  unit_basis: string;
+  energy_sources: string[];
+  groups: ChecklistGroup[];
+  item_count: number;
+  from_wiki: boolean;
+  wiki_measures: number;
+}
+
+export interface Checklist {
+  id: string;
+  title: string;
+  sector: string;
+  subsector: string;
+  site: string;
+  homepage: string;
+  owner: string;
+  note: string;
+  groups: ChecklistGroup[];
+  updated_at: string;
+}
+
+export interface ChecklistSummary {
+  id: string;
+  title: string;
+  sector: string;
+  subsector: string;
+  site: string;
+  owner: string;
+  item_count: number;
+  updated_at: string;
+}
+
+export interface TimeseriesRow {
+  stable_id: string;
+  title: string;
+  type: string;
+  sector: string;
+  sector_name: string;
+  domain: string;
+  year: string;
+  status: string;
+  numeric_verified: boolean;
+  tags: string[];
+}
+
+export interface TimeseriesYear {
+  year: string;
+  pages: number;
+  verified: number;
+  by_type: Record<string, number>;
+}
+
+export interface Timeseries {
+  rows: TimeseriesRow[];
+  years: string[];
+  by_year: TimeseriesYear[];
+  undated: number;
+  ledger_by_year: { year: string; documents: number }[];
+  sectors: KbSector[];
 }
 
 export const api = {
@@ -940,6 +1300,109 @@ export const api = {
       tag(`/api/kb/documents/${encodeURIComponent(docHash)}/tables.xlsx`),
     ttlUrl: (docHash: string) =>
       tag(`/api/kb/documents/${encodeURIComponent(docHash)}/graph.ttl`),
+  },
+
+  // --- 엔진 레이어 ---
+  // 두 솔루션이 같은 엔진을 쓴다. 화면마다 따로 상태를 물으면 서로 다른 값을
+  // 보여 주게 되므로 창구를 하나로 둔다.
+  engines: {
+    list: (refresh = false) =>
+      get<EnginesResponse>(`/api/engines${refresh ? "?refresh=true" : ""}`),
+  },
+
+  // --- 에너지 진단 위키 ---
+  // preview 는 저장하지 않는다. 사업장 키가 바뀌면 모든 stable_id 가 바뀌므로,
+  // 사람이 눈으로 확인하는 단계를 화면에서도 강제한다.
+  wiki: {
+    health: () => get<WikiHealth>("/api/wiki/health"),
+    schema: () => get<Record<string, unknown>>("/api/wiki/schema"),
+    units: () =>
+      get<{ version: string; standard: string; factors: WikiFactor[] }>("/api/wiki/units"),
+    /** PDF → 페이지 초안. 저장하지 않는다. */
+    preview: (file: File, site: string, sector?: string, owner?: string) =>
+      upload<WikiBuildResult>("/api/wiki/preview", file, { site, sector, owner }),
+    /** PDF → 위키 저장. 적재 게이트를 통과하지 못하면 아무것도 쓰지 않는다. */
+    ingest: (file: File, site: string, sector?: string, owner?: string) =>
+      upload<WikiBuildResult>("/api/wiki/ingest", file, { site, sector, owner }),
+    pages: (acl: WikiAcl, type?: string, status?: string) =>
+      get<{ pages: WikiPageSummary[]; stats: WikiStats; types: WikiTypeInfo[] }>(
+        `/api/wiki/pages?acl=${acl}` +
+          (type ? `&type=${encodeURIComponent(type)}` : "") +
+          (status ? `&status=${encodeURIComponent(status)}` : "")
+      ),
+    page: (id: string, acl: WikiAcl) =>
+      get<WikiPageDetail>(`/api/wiki/pages/${encodeURIComponent(id)}?acl=${acl}`),
+    search: (q: string, acl: WikiAcl, type?: string) =>
+      get<{ results: WikiHit[]; index: Record<string, unknown> }>(
+        `/api/wiki/search?q=${encodeURIComponent(q)}&acl=${acl}` +
+          (type ? `&type=${encodeURIComponent(type)}` : "")
+      ),
+    graph: (acl: WikiAcl) =>
+      get<{ nodes: unknown[]; edges: unknown[]; stats: Record<string, number> }>(
+        `/api/wiki/graph?acl=${acl}`
+      ),
+    lint: () => get<WikiLint>("/api/wiki/lint"),
+    queue: () =>
+      get<{ queue: WikiQueueItem[]; stats: WikiReviewStats }>("/api/wiki/review/queue"),
+    journal: () =>
+      get<{ journal: WikiJournalRow[]; stats: WikiReviewStats }>("/api/wiki/review/journal"),
+    /** 검토 결정. 서명(actor)이 없으면 서버가 400 을 준다 — 화면에서 우회할 수 없다. */
+    review: (
+      id: string,
+      body: {
+        decision: "approve" | "reject" | "deprecate";
+        actor: string;
+        note?: string;
+        acknowledge_unverified?: boolean;
+      }
+    ) => post<WikiJournalRow>(`/api/wiki/review/${encodeURIComponent(id)}`, body),
+    /** 서술 초안 제안. 페이지를 고치지 않고 제안만 돌려준다.
+     *  confidential 이상은 서버가 외부 모델 경로를 막고, 등급이 허용해도
+     *  allow_external 없이는 나가지 않는다. */
+    assist: (body: {
+      stable_id: string;
+      task?: string;
+      /** 사내/외부 선택. 비우면 서버가 사내로 처리한다. */
+      provider?: string;
+      context?: string;
+    }) => post<WikiSuggestion>("/api/wiki/assist", body),
+    /** 원문 발췌를 근거로 페이지를 다시 쓴다. 저장하지 않는다. */
+    reanalyze: (body: { stable_id: string; provider?: string }) =>
+      post<WikiReanalysis>("/api/wiki/reanalyze", body),
+    /** 재분석 결과를 반영한다. 서명이 필요하고, 반영하면 상태가 draft 로 돌아간다. */
+    applyBody: (
+      id: string,
+      body: {
+        body: string;
+        actor: string;
+        note?: string;
+        acknowledge_numbers?: boolean;
+        acknowledge_structure?: boolean;
+      }
+    ) =>
+      post<{ action: string; version: number; status: string; invented_numbers: string[] }>(
+        `/api/wiki/pages/${encodeURIComponent(id)}/apply`,
+        body
+      ),
+    log: () => get<{ log: WikiLogRow[] }>("/api/wiki/log"),
+    catalogUrl: () => tag("/api/wiki/index.md"),
+  },
+
+  /** 진단 준비. 위키를 읽어 만들 뿐 위키를 바꾸지 않는다. */
+  audit: {
+    draft: (sector: string) =>
+      get<ChecklistDraft>(`/api/audit/checklist/draft?sector=${encodeURIComponent(sector)}`),
+    list: () => get<{ checklists: ChecklistSummary[] }>("/api/audit/checklists"),
+    get: (id: string) => get<Checklist>(`/api/audit/checklists/${encodeURIComponent(id)}`),
+    save: (payload: Partial<Checklist>) => post<Checklist>("/api/audit/checklists", payload),
+    remove: (id: string) =>
+      request<{ deleted: string }>(`/api/audit/checklists/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      }),
+    timeseries: (sector: string, type: string) =>
+      get<Timeseries>(
+        `/api/audit/timeseries?sector=${encodeURIComponent(sector)}&type=${encodeURIComponent(type)}`
+      ),
   },
 };
 

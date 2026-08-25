@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import tempfile
 import urllib.parse
 from typing import Any
@@ -23,13 +24,18 @@ from fastapi.responses import FileResponse, Response
 
 from ..config import Config
 from ..i18n import normalize
-from ..kb import classify, gate, ingest as kb_ingest, ontology, parse, taxonomy
+from ..kb import classify, gate, ingest as kb_ingest, ontology, parse, sources, taxonomy
 from ..kb.store import Store
 
 router = APIRouter(prefix="/api/kb", tags=["knowledge-base"])
 
-MAX_PDF_BYTES = 50 * 1024 * 1024
-ALLOWED_SUFFIXES = {".pdf"}
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+#: 받아들이는 확장자. 목록의 원본은 `kb/sources.py` 하나뿐이다 — 화면·API·파서가
+#: 각자 목록을 들면 어딘가는 반드시 어긋난다.
+ALLOWED_SUFFIXES = set(sources.SUFFIX_KIND)
+
+# 예전 이름. 다른 모듈이 참조하고 있을 수 있어 남겨 둔다.
+MAX_PDF_BYTES = MAX_UPLOAD_BYTES
 
 _cfg: Config | None = None
 
@@ -106,13 +112,19 @@ def health() -> dict[str, Any]:
 
 
 def _parser_ready() -> dict[str, Any]:
-    """pdfplumber 가 없으면 화면이 먼저 알아야 한다 — 업로드하고 나서 알면 늦다."""
-    try:
-        import pdfplumber  # noqa: F401
-    except ImportError:
-        return {"ok": False, "reason": "pdfplumber 가 설치되지 않았다",
-                "hint": "uv pip install pdfplumber"}
-    return {"ok": True, "reason": "", "hint": ""}
+    """형식별 준비 상태. 화면이 **업로드하기 전에** 알아야 한다 — 올리고 나서
+    '아무것도 없음'을 보면 파일이 빈 것인지 도구가 없는 것인지 알 수 없다.
+
+    `ok` 는 '무엇 하나라도 읽을 수 있는가' 다. 이미지 OCR 만 빠진 상태는 정상적으로
+    있을 수 있으므로 전체를 실패로 칠하지 않는다.
+    """
+    formats = sources.readiness()
+    return {
+        "ok": bool(formats["pdf"]["ok"] or formats["sheet"]["ok"]),
+        "reason": "" if formats["pdf"]["ok"] else formats["pdf"]["reason"],
+        "hint": "" if formats["pdf"]["ok"] else formats["pdf"]["hint"],
+        "formats": formats,
+    }
 
 
 @router.get("/schema")
@@ -194,13 +206,21 @@ def gate_mask(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
 def _save_upload(filename: str, content: bytes) -> str:
     suffix = os.path.splitext((filename or "").lower())[1]
     if suffix not in ALLOWED_SUFFIXES:
-        raise HTTPException(400, f"PDF 만 지원한다. 받은 확장자: {suffix or '없음'}")
+        raise HTTPException(
+            400,
+            f"지원하지 않는 형식이다: {suffix or '확장자 없음'} "
+            f"(가능: {', '.join(sorted(ALLOWED_SUFFIXES))})")
     if not content:
         raise HTTPException(400, "빈 파일이다")
     if len(content) > MAX_PDF_BYTES:
         raise HTTPException(400, f"파일이 너무 크다 (최대 {MAX_PDF_BYTES // 1024 // 1024}MB)")
-    fd, path = tempfile.mkstemp(suffix=".pdf")
-    with os.fdopen(fd, "wb") as f:
+    # 확장자를 그대로 살린다. `.pdf` 로 고정하면 엑셀·이미지가 PDF 파서로 들어간다.
+    # 원래 파일명을 살린다. mkstemp 이름(`tmp9zzj.pdf`)을 쓰면 그 이름이 그대로
+    # 문서 해시 옆에 남아, 나중에 위키의 `source_span` 이 존재하지 않는 파일을 가리킨다.
+    safe = os.path.basename(filename or f"upload{suffix}").replace("/", "_")
+    directory = tempfile.mkdtemp()
+    path = os.path.join(directory, safe or f"upload{suffix}")
+    with open(path, "wb") as f:
         f.write(content)
     return path
 
@@ -264,7 +284,7 @@ async def analyze(
         out["destination"] = _destination_dict(provider, dest)
         return out
     finally:
-        os.unlink(path)
+        shutil.rmtree(os.path.dirname(path), ignore_errors=True)
 
 
 @router.post("/ingest")
@@ -293,7 +313,7 @@ async def ingest(
         out["stored"] = _store().ingest(res, mask=mask, destination=dest_dict)
         return out
     finally:
-        os.unlink(path)
+        shutil.rmtree(os.path.dirname(path), ignore_errors=True)
 
 
 # --------------------------------------------------------------------------- #
