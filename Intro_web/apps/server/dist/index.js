@@ -1926,7 +1926,7 @@ var util_exports = /* @__PURE__ */ __export({
 	required: () => required,
 	safeExtend: () => safeExtend,
 	shallowClone: () => shallowClone,
-	slugify: () => slugify,
+	slugify: () => slugify$2,
 	stringifyPrimitive: () => stringifyPrimitive,
 	uint8ArrayToBase64: () => uint8ArrayToBase64,
 	uint8ArrayToBase64url: () => uint8ArrayToBase64url,
@@ -2042,7 +2042,7 @@ function randomString(length = 10) {
 function esc(str) {
 	return JSON.stringify(str);
 }
-function slugify(input) {
+function slugify$2(input) {
 	return input.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/[\s_-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 const captureStackTrace = "captureStackTrace" in Error ? Error.captureStackTrace : (..._args) => {};
@@ -11472,7 +11472,7 @@ function _toUpperCase() {
 }
 /* @__NO_SIDE_EFFECTS__ */
 function _slugify() {
-	return /* @__PURE__ */ _overwrite((input) => slugify(input));
+	return /* @__PURE__ */ _overwrite((input) => slugify$2(input));
 }
 /* @__NO_SIDE_EFFECTS__ */
 function _array(Class$1, element, params) {
@@ -15304,9 +15304,19 @@ function apiFailure(code, message$1) {
 		}
 	};
 }
+const publicRoute = async (_c, next) => {
+	await next();
+};
 const protectedRoute = async (c, next) => {
 	const user$1 = c.var.user;
 	if (!user$1) return c.json(apiFailure("UNAUTHORIZED", "Unauthorized"), 401);
+	c.set("currentUser", user$1);
+	await next();
+};
+const adminRoute = async (c, next) => {
+	const user$1 = c.var.user;
+	if (!user$1) return c.json(apiFailure("UNAUTHORIZED", "Unauthorized"), 401);
+	if (user$1.role !== "admin") return c.json(apiFailure("FORBIDDEN", "Forbidden"), 403);
 	c.set("currentUser", user$1);
 	await next();
 };
@@ -15341,7 +15351,10 @@ const env = {
 	SKYWORK_API_TOKEN: readEnv(process.env.SKYWORK_API_TOKEN) ?? "",
 	SKYWORK_AI_BASE_URL: readEnv(process.env.SKYWORK_AI_BASE_URL) ?? "https://api.skywork.ai/skycowork-llm/",
 	GOOGLE_CLIENT_ID: readEnv(process.env.GOOGLE_CLIENT_ID, process.env.VITE_GOOGLE_CLIENT_ID, viteEnv.VITE_GOOGLE_CLIENT_ID) ?? "",
-	GOOGLE_CLIENT_SECRET: readEnv(process.env.GOOGLE_CLIENT_SECRET) ?? ""
+	GOOGLE_CLIENT_SECRET: readEnv(process.env.GOOGLE_CLIENT_SECRET) ?? "",
+	STAFF_DEFAULT_PASSWORD: readEnv(process.env.STAFF_DEFAULT_PASSWORD) ?? "",
+	STAFF_ADMIN_PASSWORD: readEnv(process.env.STAFF_ADMIN_PASSWORD) ?? "",
+	STAFF_EMAIL_DOMAIN: readEnv(process.env.STAFF_EMAIL_DOMAIN) ?? "ets.co.kr"
 };
 function readCliPort(argv) {
 	for (let index$1 = 0; index$1 < argv.length; index$1 += 1) {
@@ -16496,10 +16509,10 @@ var SHA2_32B = class extends HashMD {
 		super(64, outputLen, 8, false);
 	}
 	get() {
-		const { A, B, C, D, E, F, G, H } = this;
+		const { A, B: B$1, C, D, E, F, G, H } = this;
 		return [
 			A,
-			B,
+			B$1,
 			C,
 			D,
 			E,
@@ -16508,9 +16521,9 @@ var SHA2_32B = class extends HashMD {
 			H
 		];
 	}
-	set(A, B, C, D, E, F, G, H) {
+	set(A, B$1, C, D, E, F, G, H) {
 		this.A = A | 0;
-		this.B = B | 0;
+		this.B = B$1 | 0;
 		this.C = C | 0;
 		this.D = D | 0;
 		this.E = E | 0;
@@ -16526,29 +16539,29 @@ var SHA2_32B = class extends HashMD {
 			const s0 = rotr(W15, 7) ^ rotr(W15, 18) ^ W15 >>> 3;
 			SHA256_W[i] = (rotr(W2, 17) ^ rotr(W2, 19) ^ W2 >>> 10) + SHA256_W[i - 7] + s0 + SHA256_W[i - 16] | 0;
 		}
-		let { A, B, C, D, E, F, G, H } = this;
+		let { A, B: B$1, C, D, E, F, G, H } = this;
 		for (let i = 0; i < 64; i++) {
 			const sigma1 = rotr(E, 6) ^ rotr(E, 11) ^ rotr(E, 25);
 			const T1 = H + sigma1 + Chi(E, F, G) + SHA256_K[i] + SHA256_W[i] | 0;
-			const T2 = (rotr(A, 2) ^ rotr(A, 13) ^ rotr(A, 22)) + Maj(A, B, C) | 0;
+			const T2 = (rotr(A, 2) ^ rotr(A, 13) ^ rotr(A, 22)) + Maj(A, B$1, C) | 0;
 			H = G;
 			G = F;
 			F = E;
 			E = D + T1 | 0;
 			D = C;
-			C = B;
-			B = A;
+			C = B$1;
+			B$1 = A;
 			A = T1 + T2 | 0;
 		}
 		A = A + this.A | 0;
-		B = B + this.B | 0;
+		B$1 = B$1 + this.B | 0;
 		C = C + this.C | 0;
 		D = D + this.D | 0;
 		E = E + this.E | 0;
 		F = F + this.F | 0;
 		G = G + this.G | 0;
 		H = H + this.H | 0;
-		this.set(A, B, C, D, E, F, G, H);
+		this.set(A, B$1, C, D, E, F, G, H);
 	}
 	roundClean() {
 		clean$1(SHA256_W);
@@ -20479,7 +20492,7 @@ var noopOpenTelemetryAPI = createNoopOpenTelemetryAPI();
 var openTelemetryAPIPromise;
 var openTelemetryAPI;
 function getOpenTelemetryAPI() {
-	if (!openTelemetryAPIPromise) openTelemetryAPIPromise = import("./assets/core-B45hK-on.js").then((mod) => {
+	if (!openTelemetryAPIPromise) openTelemetryAPIPromise = import("./assets/core-DikeofNU.js").then((mod) => {
 		openTelemetryAPI = mod;
 	}).catch(() => void 0);
 	return openTelemetryAPI ?? noopOpenTelemetryAPI;
@@ -31202,7 +31215,7 @@ async function getBaseAdapter(options, handleDirectDatabase) {
 			acc[key] = [];
 			return acc;
 		}, {});
-		const { memoryAdapter } = await import("./assets/dist-BvSHavyb.js");
+		const { memoryAdapter } = await import("./assets/dist-DNBNx90a.js");
 		adapter = memoryAdapter(memoryDB)(options);
 	} else if (typeof options.database === "function") adapter = options.database(options);
 	else adapter = await handleDirectDatabase(options);
@@ -37700,11 +37713,20 @@ var SQLiteTransaction = class extends BaseSQLiteDatabase {
 var schema_exports = /* @__PURE__ */ __export({
 	account: () => account,
 	aiBusinessScenes: () => aiBusinessScenes,
+	diagnoses: () => diagnoses,
+	diagnosisMeasures: () => diagnosisMeasures,
+	energyFactors: () => energyFactors,
+	inquiries: () => inquiries,
+	postLikes: () => postLikes,
+	posts: () => posts,
 	session: () => session,
+	solarApplications: () => solarApplications,
 	storageFiles: () => storageFiles,
 	todos: () => todos,
 	user: () => user,
-	verification: () => verification
+	verification: () => verification,
+	wikiPages: () => wikiPages,
+	wikiRevisions: () => wikiRevisions
 }, 1);
 const user = sqliteTable("user", {
 	id: text("id").primaryKey(),
@@ -37716,7 +37738,10 @@ const user = sqliteTable("user", {
 	updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull(),
 	role: text("role").default("user"),
 	username: text("username").unique(),
-	displayUsername: text("displayUsername")
+	displayUsername: text("displayUsername"),
+	memberType: text("memberType").notNull().default("customer"),
+	phone: text("phone"),
+	department: text("department")
 });
 const session = sqliteTable("session", {
 	id: text("id").primaryKey(),
@@ -37793,6 +37818,214 @@ const aiBusinessScenes = sqliteTable("ai_business_scenes", {
 	createdAt: text("createdAt").notNull().default(sql`CURRENT_TIMESTAMP`),
 	updatedAt: text("updatedAt").notNull().default(sql`CURRENT_TIMESTAMP`)
 }, (table) => [index("idx_ai_business_scenes_scene_key").on(table.sceneKey)]);
+const posts = sqliteTable("posts", {
+	id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+	slug: text("slug").notNull().unique(),
+	type: text("type", { enum: ["blog", "shorts"] }).notNull().default("blog"),
+	title: text("title").notNull(),
+	summary: text("summary").notNull().default(""),
+	body: text("body").notNull().default(""),
+	tag: text("tag").notNull().default(""),
+	coverImage: text("coverImage"),
+	videoUrl: text("videoUrl"),
+	duration: text("duration").notNull().default(""),
+	status: text("status", { enum: ["draft", "published"] }).notNull().default("draft"),
+	authorId: text("authorId"),
+	viewCount: integer("viewCount").notNull().default(0),
+	likeCount: integer("likeCount").notNull().default(0),
+	publishedAt: text("publishedAt"),
+	createdAt: text("createdAt").notNull().default(sql`CURRENT_TIMESTAMP`),
+	updatedAt: text("updatedAt").notNull().default(sql`CURRENT_TIMESTAMP`)
+}, (table) => [index("idx_posts_status").on(table.status), index("idx_posts_type").on(table.type)]);
+const postLikes = sqliteTable("post_likes", {
+	postId: text("postId").notNull(),
+	userId: text("userId").notNull(),
+	createdAt: text("createdAt").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
+const solarApplications = sqliteTable("solar_applications", {
+	id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+	userId: text("userId").notNull(),
+	applicantName: text("applicantName").notNull(),
+	phone: text("phone").notNull(),
+	email: text("email").notNull(),
+	postalCode: text("postalCode").notNull().default(""),
+	address: text("address").notNull(),
+	buildingType: text("buildingType").notNull().default("apartment"),
+	balconyDirection: text("balconyDirection").notNull().default("south"),
+	balconyWidth: text("balconyWidth").notNull().default(""),
+	monthlyBill: integer("monthlyBill").notNull().default(0),
+	packageId: text("packageId").notNull().default(""),
+	packageName: text("packageName").notNull().default(""),
+	quantity: integer("quantity").notNull().default(1),
+	visitPreference: text("visitPreference").notNull().default(""),
+	note: text("note").notNull().default(""),
+	privacyAgreed: integer("privacyAgreed", { mode: "boolean" }).notNull().default(false),
+	status: text("status", { enum: [
+		"received",
+		"reviewing",
+		"surveying",
+		"quoted",
+		"closed"
+	] }).notNull().default("received"),
+	assigneeId: text("assigneeId"),
+	staffMemo: text("staffMemo").notNull().default(""),
+	createdAt: text("createdAt").notNull().default(sql`CURRENT_TIMESTAMP`),
+	updatedAt: text("updatedAt").notNull().default(sql`CURRENT_TIMESTAMP`)
+}, (table) => [index("idx_solar_applications_userId").on(table.userId), index("idx_solar_applications_status").on(table.status)]);
+const inquiries = sqliteTable("inquiries", {
+	id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+	userId: text("userId"),
+	type: text("type").notNull().default("기타"),
+	name: text("name").notNull(),
+	company: text("company").notNull().default(""),
+	phone: text("phone").notNull().default(""),
+	email: text("email").notNull(),
+	message: text("message").notNull(),
+	status: text("status", { enum: [
+		"received",
+		"handling",
+		"done"
+	] }).notNull().default("received"),
+	assigneeId: text("assigneeId"),
+	staffMemo: text("staffMemo").notNull().default(""),
+	createdAt: text("createdAt").notNull().default(sql`CURRENT_TIMESTAMP`),
+	updatedAt: text("updatedAt").notNull().default(sql`CURRENT_TIMESTAMP`)
+}, (table) => [index("idx_inquiries_status").on(table.status)]);
+const wikiPages = sqliteTable("wiki_pages", {
+	id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+	slug: text("slug").notNull().unique(),
+	type: text("type", { enum: [
+		"source",
+		"facility",
+		"equipment",
+		"measure",
+		"metric",
+		"regulation",
+		"vendor",
+		"diagnosis",
+		"concept"
+	] }).notNull().default("concept"),
+	title: text("title").notNull(),
+	summary: text("summary").notNull().default(""),
+	body: text("body").notNull().default(""),
+	tags: text("tags").notNull().default(""),
+	acl: text("acl", { enum: [
+		"public",
+		"internal",
+		"confidential",
+		"restricted"
+	] }).notNull().default("internal"),
+	status: text("status", { enum: [
+		"draft",
+		"reviewed",
+		"deprecated"
+	] }).notNull().default("draft"),
+	sourceRef: text("sourceRef").notNull().default(""),
+	ownerId: text("ownerId"),
+	version: integer("version").notNull().default(1),
+	sector: text("sector").notNull().default("other"),
+	measurementBasis: text("measurementBasis", { enum: [
+		"measured",
+		"estimated",
+		"design",
+		"documented"
+	] }).notNull().default("documented"),
+	measurementPeriod: text("measurementPeriod").notNull().default(""),
+	confidence: text("confidence", { enum: [
+		"high",
+		"medium",
+		"low"
+	] }).notNull().default("medium"),
+	numericVerified: integer("numericVerified", { mode: "boolean" }).notNull().default(false),
+	owner: text("owner").notNull().default(""),
+	validUntil: text("validUntil").notNull().default(""),
+	contentHash: text("contentHash").notNull().default(""),
+	ingestedBy: text("ingestedBy").notNull().default("human"),
+	ingestedAt: text("ingestedAt").notNull().default(""),
+	pipelineVersion: text("pipelineVersion").notNull().default(""),
+	createdAt: text("createdAt").notNull().default(sql`CURRENT_TIMESTAMP`),
+	updatedAt: text("updatedAt").notNull().default(sql`CURRENT_TIMESTAMP`)
+}, (table) => [
+	index("idx_wiki_pages_type").on(table.type),
+	index("idx_wiki_pages_status").on(table.status),
+	index("idx_wiki_pages_sector").on(table.sector),
+	index("idx_wiki_pages_acl").on(table.acl)
+]);
+const wikiRevisions = sqliteTable("wiki_revisions", {
+	id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+	pageId: text("pageId").notNull(),
+	version: integer("version").notNull(),
+	title: text("title").notNull(),
+	body: text("body").notNull(),
+	note: text("note").notNull().default(""),
+	editorId: text("editorId"),
+	createdAt: text("createdAt").notNull().default(sql`CURRENT_TIMESTAMP`)
+}, (table) => [index("idx_wiki_revisions_pageId").on(table.pageId)]);
+const diagnoses = sqliteTable("diagnoses", {
+	id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+	code: text("code").notNull().unique(),
+	facilityName: text("facilityName").notNull(),
+	sector: text("sector").notNull().default("other"),
+	region: text("region").notNull().default(""),
+	auditYear: integer("auditYear").notNull().default(0),
+	unitBasisValue: real("unitBasisValue").notNull().default(0),
+	unitBasisNote: text("unitBasisNote").notNull().default(""),
+	annualElectricityKwh: real("annualElectricityKwh").notNull().default(0),
+	annualFuelToe: real("annualFuelToe").notNull().default(0),
+	annualEnergyToe: real("annualEnergyToe").notNull().default(0),
+	annualGhgTco2eq: real("annualGhgTco2eq").notNull().default(0),
+	energyIntensity: real("energyIntensity").notNull().default(0),
+	measurementBasis: text("measurementBasis", { enum: [
+		"measured",
+		"estimated",
+		"design",
+		"documented"
+	] }).notNull().default("documented"),
+	measurementPeriod: text("measurementPeriod").notNull().default(""),
+	acl: text("acl", { enum: [
+		"public",
+		"internal",
+		"confidential",
+		"restricted"
+	] }).notNull().default("confidential"),
+	numericVerified: integer("numericVerified", { mode: "boolean" }).notNull().default(false),
+	wikiSlug: text("wikiSlug").notNull().default(""),
+	equipmentTags: text("equipmentTags").notNull().default(""),
+	note: text("note").notNull().default(""),
+	ownerId: text("ownerId"),
+	createdAt: text("createdAt").notNull().default(sql`CURRENT_TIMESTAMP`),
+	updatedAt: text("updatedAt").notNull().default(sql`CURRENT_TIMESTAMP`)
+}, (table) => [index("idx_diagnoses_sector").on(table.sector), index("idx_diagnoses_year").on(table.auditYear)]);
+const diagnosisMeasures = sqliteTable("diagnosis_measures", {
+	id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+	diagnosisId: text("diagnosisId").notNull(),
+	measureSlug: text("measureSlug").notNull(),
+	savingToe: real("savingToe").notNull().default(0),
+	savingKwh: real("savingKwh").notNull().default(0),
+	annualSavingKrw: real("annualSavingKrw").notNull().default(0),
+	investmentKrw: real("investmentKrw").notNull().default(0),
+	paybackYears: real("paybackYears").notNull().default(0),
+	adopted: integer("adopted", { mode: "boolean" }).notNull().default(false),
+	adoptionNote: text("adoptionNote").notNull().default(""),
+	numericVerified: integer("numericVerified", { mode: "boolean" }).notNull().default(false),
+	createdAt: text("createdAt").notNull().default(sql`CURRENT_TIMESTAMP`)
+}, (table) => [index("idx_diagnosis_measures_diagnosisId").on(table.diagnosisId), index("idx_diagnosis_measures_measureSlug").on(table.measureSlug)]);
+const energyFactors = sqliteTable("energy_factors", {
+	code: text("code").primaryKey(),
+	label: text("label").notNull(),
+	category: text("category", { enum: [
+		"toe",
+		"ghg",
+		"price"
+	] }).notNull().default("toe"),
+	value: real("value").notNull(),
+	unit: text("unit").notNull(),
+	source: text("source").notNull().default(""),
+	validFrom: text("validFrom").notNull().default(""),
+	validUntil: text("validUntil").notNull().default(""),
+	verified: integer("verified", { mode: "boolean" }).notNull().default(false),
+	updatedAt: text("updatedAt").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
 var LibsqlError = class extends Error {
 	code;
 	extendedCode;
@@ -44747,6 +44980,1044 @@ authConfigRouter.get("/", (c) => {
 		thirdPartySocialProviders: enabledThirdPartySocialProviders
 	}));
 });
+async function getMemberProfile(userId) {
+	const row = (await getDb().select().from(user).where(eq(user.id, userId)).limit(1))[0];
+	if (!row) return null;
+	return {
+		id: row.id,
+		name: row.name,
+		email: row.email,
+		username: row.username ?? null,
+		role: row.role === "admin" ? "admin" : "user",
+		memberType: row.memberType === "staff" ? "staff" : "customer",
+		department: row.department ?? null,
+		phone: row.phone ?? null,
+		emailVerified: Boolean(row.emailVerified)
+	};
+}
+function isStaff(profile) {
+	return Boolean(profile && (profile.memberType === "staff" || profile.role === "admin"));
+}
+const staffRoute = async (c, next) => {
+	const sessionUser = c.var.user;
+	if (!sessionUser) return c.json(apiFailure("UNAUTHORIZED", "로그인이 필요합니다."), 401);
+	const profile = await getMemberProfile(sessionUser.id);
+	if (!isStaff(profile)) return c.json(apiFailure("FORBIDDEN", "임직원 전용 기능입니다."), 403);
+	c.set("currentUser", sessionUser);
+	c.set("memberProfile", profile);
+	await next();
+};
+function databaseStatus$1(error$51) {
+	if (error$51.status === 404) return 404;
+	if (error$51.status === 503) return 503;
+	return 502;
+}
+function toDatabaseFailure(error$51) {
+	if (error$51 instanceof DatabaseError) return {
+		body: apiFailure(error$51.code, error$51.message),
+		status: databaseStatus$1(error$51)
+	};
+	return null;
+}
+function invalidInput(message$1) {
+	return apiFailure("INVALID_INPUT", message$1);
+}
+const METRIC_LABELS = {
+	annual_electricity_kwh: "연간 전력사용량(kWh)",
+	annual_fuel: "연간 연료사용량",
+	annual_energy_toe: "연간 환산에너지사용량(toe)",
+	annual_ghg_tco2eq: "연간 온실가스 배출량(tCO2eq)",
+	treatment_capacity_tpd: "처리용량(톤/일)",
+	production_output: "생산량",
+	floor_area_m2: "연면적(㎡)",
+	cultivation_area_m2: "재배면적(㎡)",
+	moisture_stage: "공정단계별 함수율",
+	energy_intensity: "에너지 원단위",
+	steam_balance: "증기 수지",
+	furnace_efficiency: "노(爐) 열효율"
+};
+const METRIC_PATTERNS = {
+	annual_electricity_kwh: [
+		"연간 전력",
+		"전력사용량",
+		"소비전력",
+		"kWh/y"
+	],
+	annual_fuel: [
+		"연료사용량",
+		"연료소비량",
+		"가스소비량",
+		"LPG 사용",
+		"kg/h"
+	],
+	annual_energy_toe: [
+		"환산에너지",
+		"toe",
+		"TOE"
+	],
+	annual_ghg_tco2eq: [
+		"온실가스",
+		"tCO2eq",
+		"CO2eq",
+		"배출량"
+	],
+	treatment_capacity_tpd: [
+		"처리용량",
+		"톤/일",
+		"t/일",
+		"처리량",
+		"허가물량"
+	],
+	production_output: [
+		"생산량",
+		"생산실적",
+		"제품 생산"
+	],
+	floor_area_m2: ["연면적", "건축면적"],
+	cultivation_area_m2: ["재배면적", "시설면적"],
+	moisture_stage: [
+		"함수율",
+		"수분",
+		"탈수"
+	],
+	energy_intensity: [
+		"원단위",
+		"단위당 에너지",
+		"에너지원단위"
+	],
+	steam_balance: [
+		"증기",
+		"스팀",
+		"t/h"
+	],
+	furnace_efficiency: [
+		"열효율",
+		"노효율",
+		"연소효율"
+	]
+};
+var BASE_METRICS = [
+	"annual_electricity_kwh",
+	"annual_fuel",
+	"annual_energy_toe",
+	"annual_ghg_tco2eq"
+];
+const SECTORS = [
+	{
+		code: "waste",
+		name: "폐기물처리·자원순환",
+		ksic: "E38",
+		energySources: [
+			"전력",
+			"LPG",
+			"LNG",
+			"경유",
+			"폐열"
+		],
+		keyEquipment: [
+			"건조기",
+			"보일러",
+			"송풍기",
+			"탈수기",
+			"파쇄기",
+			"탈취설비"
+		],
+		requiredMetrics: [
+			...BASE_METRICS,
+			"treatment_capacity_tpd",
+			"moisture_stage",
+			"energy_intensity"
+		],
+		unitBasis: "처리량 1톤당",
+		hints: [
+			"음식물",
+			"음폐",
+			"폐기물",
+			"퇴비",
+			"부숙",
+			"슬러지",
+			"자원화",
+			"함수율",
+			"소각",
+			"발효"
+		],
+		notes: "함수율 물질수지가 건조 열량의 타당성을 좌우한다. 「비료관리법」 공정규격 연계."
+	},
+	{
+		code: "food",
+		name: "식품제조",
+		ksic: "C10-11",
+		energySources: [
+			"전력",
+			"LNG",
+			"스팀"
+		],
+		keyEquipment: [
+			"보일러",
+			"냉동기",
+			"살균설비",
+			"건조기",
+			"공조기"
+		],
+		requiredMetrics: [
+			...BASE_METRICS,
+			"production_output",
+			"energy_intensity"
+		],
+		unitBasis: "제품 1톤당",
+		hints: [
+			"식품",
+			"살균",
+			"냉동",
+			"냉장",
+			"가공식품",
+			"HACCP",
+			"제조라인"
+		],
+		notes: ""
+	},
+	{
+		code: "chemical",
+		name: "화학·석유화학",
+		ksic: "C20-21",
+		energySources: [
+			"전력",
+			"LNG",
+			"스팀",
+			"중유"
+		],
+		keyEquipment: [
+			"반응기",
+			"증류탑",
+			"열교환기",
+			"보일러",
+			"압축기",
+			"펌프"
+		],
+		requiredMetrics: [
+			...BASE_METRICS,
+			"production_output",
+			"energy_intensity",
+			"steam_balance"
+		],
+		unitBasis: "제품 1톤당",
+		hints: [
+			"반응기",
+			"증류",
+			"석유화학",
+			"촉매",
+			"플랜트",
+			"정제",
+			"중합"
+		],
+		notes: "열통합(pinch) 분석 유무가 진단 품질을 가른다."
+	},
+	{
+		code: "metal",
+		name: "1차금속·금속가공",
+		ksic: "C24-25",
+		energySources: [
+			"전력",
+			"LNG",
+			"코크스"
+		],
+		keyEquipment: [
+			"가열로",
+			"열처리로",
+			"압축기",
+			"집진기",
+			"전기로"
+		],
+		requiredMetrics: [
+			...BASE_METRICS,
+			"production_output",
+			"energy_intensity",
+			"furnace_efficiency"
+		],
+		unitBasis: "제품 1톤당",
+		hints: [
+			"주조",
+			"단조",
+			"열처리",
+			"가열로",
+			"압연",
+			"도금",
+			"용해로",
+			"전기로"
+		],
+		notes: ""
+	},
+	{
+		code: "textile",
+		name: "섬유·의복",
+		ksic: "C13-14",
+		energySources: [
+			"전력",
+			"LNG",
+			"스팀"
+		],
+		keyEquipment: [
+			"염색기",
+			"텐터",
+			"보일러",
+			"건조기"
+		],
+		requiredMetrics: [
+			...BASE_METRICS,
+			"production_output",
+			"energy_intensity"
+		],
+		unitBasis: "원단 1,000m당",
+		hints: [
+			"염색",
+			"텐터",
+			"방적",
+			"직물",
+			"가공사",
+			"섬유"
+		],
+		notes: ""
+	},
+	{
+		code: "paper",
+		name: "펄프·종이",
+		ksic: "C17",
+		energySources: [
+			"전력",
+			"LNG",
+			"스팀",
+			"바이오매스"
+		],
+		keyEquipment: [
+			"초지기",
+			"보일러",
+			"건조부",
+			"진공펌프"
+		],
+		requiredMetrics: [
+			...BASE_METRICS,
+			"production_output",
+			"energy_intensity",
+			"steam_balance"
+		],
+		unitBasis: "제품 1톤당",
+		hints: [
+			"초지",
+			"제지",
+			"펄프",
+			"골판지",
+			"지력"
+		],
+		notes: ""
+	},
+	{
+		code: "nonmetal",
+		name: "비금속광물(요업·시멘트)",
+		ksic: "C23",
+		energySources: [
+			"전력",
+			"유연탄",
+			"LNG"
+		],
+		keyEquipment: [
+			"소성로",
+			"킬른",
+			"분쇄기",
+			"예열기"
+		],
+		requiredMetrics: [
+			...BASE_METRICS,
+			"production_output",
+			"energy_intensity",
+			"furnace_efficiency"
+		],
+		unitBasis: "제품 1톤당",
+		hints: [
+			"소성",
+			"킬른",
+			"시멘트",
+			"요업",
+			"내화물",
+			"유리용해"
+		],
+		notes: ""
+	},
+	{
+		code: "machinery",
+		name: "기계·전자·자동차",
+		ksic: "C26-30",
+		energySources: ["전력", "LNG"],
+		keyEquipment: [
+			"압축기",
+			"공조기",
+			"도장설비",
+			"클린룸",
+			"사출기"
+		],
+		requiredMetrics: [
+			"annual_electricity_kwh",
+			"annual_energy_toe",
+			"annual_ghg_tco2eq",
+			"production_output",
+			"energy_intensity"
+		],
+		unitBasis: "제품 1대당",
+		hints: [
+			"사출",
+			"도장",
+			"클린룸",
+			"조립라인",
+			"반도체",
+			"디스플레이",
+			"프레스"
+		],
+		notes: ""
+	},
+	{
+		code: "building",
+		name: "건물(업무·상업·공공)",
+		ksic: "L68",
+		energySources: [
+			"전력",
+			"지역난방",
+			"LNG"
+		],
+		keyEquipment: [
+			"냉동기",
+			"공조기",
+			"보일러",
+			"조명",
+			"승강기"
+		],
+		requiredMetrics: [
+			...BASE_METRICS,
+			"floor_area_m2",
+			"energy_intensity"
+		],
+		unitBasis: "연면적 1㎡당",
+		hints: [
+			"연면적",
+			"공조",
+			"냉동기",
+			"지역난방",
+			"조명",
+			"빌딩",
+			"청사",
+			"EPI"
+		],
+		notes: "원단위 분모가 면적이라 다른 업종과 벤치마크를 섞으면 안 된다."
+	},
+	{
+		code: "agri",
+		name: "농업·시설원예",
+		ksic: "A01",
+		energySources: [
+			"전력",
+			"경유",
+			"LPG",
+			"지열"
+		],
+		keyEquipment: [
+			"난방기",
+			"히트펌프",
+			"관수설비",
+			"제습기"
+		],
+		requiredMetrics: [
+			...BASE_METRICS,
+			"cultivation_area_m2",
+			"energy_intensity"
+		],
+		unitBasis: "재배면적 1㎡당",
+		hints: [
+			"시설원예",
+			"온실",
+			"육묘",
+			"축사",
+			"양계",
+			"재배면적",
+			"히트펌프"
+		],
+		notes: ""
+	},
+	{
+		code: "water",
+		name: "상하수도·수처리",
+		ksic: "E36-37",
+		energySources: ["전력"],
+		keyEquipment: [
+			"송풍기",
+			"펌프",
+			"탈수기",
+			"소화조"
+		],
+		requiredMetrics: [
+			"annual_electricity_kwh",
+			"annual_energy_toe",
+			"annual_ghg_tco2eq",
+			"treatment_capacity_tpd",
+			"energy_intensity"
+		],
+		unitBasis: "처리수량 1,000㎥당",
+		hints: [
+			"하수처리",
+			"정수장",
+			"송풍",
+			"폭기",
+			"소화가스",
+			"방류수",
+			"수처리"
+		],
+		notes: ""
+	},
+	{
+		code: "other",
+		name: "기타·미분류",
+		ksic: "-",
+		energySources: [],
+		keyEquipment: [],
+		requiredMetrics: ["annual_energy_toe", "annual_ghg_tco2eq"],
+		unitBasis: "-",
+		hints: [],
+		notes: "분류 신뢰도가 낮을 때의 안전한 기본값. 사람이 확정해야 한다."
+	}
+];
+const SECTOR_CODES = SECTORS.map((sector) => sector.code);
+function getSector(code) {
+	return SECTORS.find((sector) => sector.code === code) ?? SECTORS[SECTORS.length - 1];
+}
+function classifySector(text$1) {
+	const haystack = text$1.toLowerCase();
+	const votes = SECTORS.filter((sector) => sector.hints.length).map((sector) => ({
+		sector: sector.code,
+		name: sector.name,
+		hits: sector.hints.filter((hint) => haystack.includes(hint.toLowerCase())).length
+	})).sort((a, b) => b.hits - a.hits);
+	const top = votes[0];
+	const second = votes[1];
+	if (!top || top.hits === 0) return {
+		sector: "other",
+		confidence: 0,
+		reason: "일치하는 업종 어휘가 없습니다. 담당자가 지정해야 합니다."
+	};
+	const gap = second && second.hits > 0 ? (top.hits - second.hits) / top.hits : 1;
+	const confidence = Math.min(.95, top.hits / (top.hits + 4) * (.5 + gap * .5));
+	return {
+		sector: top.sector,
+		confidence: Number(confidence.toFixed(3)),
+		reason: `${top.name} 어휘 ${top.hits}종 일치, 2위 대비 격차 ${Math.round(gap * 100)}%.`
+	};
+}
+function missingMetrics(sectorCode, text$1) {
+	const profile = getSector(sectorCode);
+	const haystack = text$1.toLowerCase();
+	return profile.requiredMetrics.filter((metric) => !METRIC_PATTERNS[metric].some((pattern) => haystack.includes(pattern.toLowerCase()))).map((metric) => ({
+		code: metric,
+		label: METRIC_LABELS[metric]
+	}));
+}
+const DEFAULT_FACTORS = [
+	{
+		code: "elec_toe",
+		label: "전력 → toe 환산",
+		category: "toe",
+		value: 215e-6,
+		unit: "toe/kWh",
+		source: "기본값 — 에너지법 시행규칙 별표 원문 확인 필요"
+	},
+	{
+		code: "elec_ghg",
+		label: "전력 배출계수",
+		category: "ghg",
+		value: .4594,
+		unit: "tCO2eq/MWh",
+		source: "기본값 — 국가 온실가스 배출계수 고시 확인 필요"
+	},
+	{
+		code: "lng_toe",
+		label: "LNG → toe 환산",
+		category: "toe",
+		value: .001055,
+		unit: "toe/Nm³",
+		source: "기본값 — 고시 원문 확인 필요"
+	},
+	{
+		code: "lpg_toe",
+		label: "LPG → toe 환산",
+		category: "toe",
+		value: .0012,
+		unit: "toe/kg",
+		source: "기본값 — 고시 원문 확인 필요"
+	},
+	{
+		code: "diesel_toe",
+		label: "경유 → toe 환산",
+		category: "toe",
+		value: 902e-6,
+		unit: "toe/L",
+		source: "기본값 — 고시 원문 확인 필요"
+	},
+	{
+		code: "bunker_c_toe",
+		label: "B-C유 → toe 환산",
+		category: "toe",
+		value: 99e-5,
+		unit: "toe/L",
+		source: "기본값 — 고시 원문 확인 필요"
+	},
+	{
+		code: "elec_price",
+		label: "전력 단가",
+		category: "price",
+		value: 130,
+		unit: "원/kWh",
+		source: "기본값 — 계약종별 단가로 교체 필요"
+	},
+	{
+		code: "lng_price",
+		label: "LNG 단가",
+		category: "price",
+		value: 1100,
+		unit: "원/Nm³",
+		source: "기본값 — 실제 구매단가로 교체 필요"
+	}
+];
+async function ensureFactors() {
+	const db$1 = getDb();
+	const now$1 = (/* @__PURE__ */ new Date()).toISOString();
+	for (const seed of DEFAULT_FACTORS) {
+		if ((await db$1.select().from(energyFactors).where(eq(energyFactors.code, seed.code)).limit(1))[0]) continue;
+		await db$1.insert(energyFactors).values({
+			...seed,
+			verified: false,
+			updatedAt: now$1
+		});
+	}
+}
+async function loadFactors() {
+	const rows = await getDb().select().from(energyFactors);
+	const map$2 = {};
+	for (const row of rows) map$2[row.code] = row;
+	return map$2;
+}
+function factorValue(factors, code, notes) {
+	const factor = factors[code];
+	if (!factor) {
+		notes.push({
+			level: "block",
+			message: `계수 ${code} 가 등록되어 있지 않습니다.`
+		});
+		return null;
+	}
+	if (!factor.verified) notes.push({
+		level: "warn",
+		message: `${factor.label} 은(는) 미검증 기본값입니다 (${factor.value} ${factor.unit}).`
+	});
+	if (factor.validUntil && factor.validUntil < (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)) notes.push({
+		level: "warn",
+		message: `${factor.label} 의 유효기간이 지났습니다 (~${factor.validUntil}).`
+	});
+	return factor.value;
+}
+function computeDiagnosisNumbers(input, factors) {
+	const notes = [];
+	const elecToe = factorValue(factors, "elec_toe", notes);
+	const elecGhg = factorValue(factors, "elec_ghg", notes);
+	const annualEnergyToe = round((elecToe === null ? 0 : input.annualElectricityKwh * elecToe) + input.annualFuelToe, 3);
+	const annualGhgTco2eq = elecGhg === null ? 0 : round(input.annualElectricityKwh / 1e3 * elecGhg, 3);
+	if (input.unitBasisValue <= 0) notes.push({
+		level: "block",
+		message: "원단위 분모(연면적·생산량·처리량)가 0 입니다. 벤치마크에서 제외됩니다."
+	});
+	return {
+		annualEnergyToe,
+		annualGhgTco2eq,
+		energyIntensity: input.unitBasisValue > 0 ? round(annualEnergyToe / input.unitBasisValue, 6) : 0,
+		numericVerified: notes.length === 0 && annualEnergyToe > 0,
+		notes
+	};
+}
+function computeMeasureNumbers(input, factors) {
+	const notes = [];
+	const elecToe = factorValue(factors, "elec_toe", notes);
+	const elecPrice = factorValue(factors, "elec_price", notes);
+	const savingToe = input.savingToe > 0 ? input.savingToe : elecToe === null ? 0 : round(input.savingKwh * elecToe, 3);
+	const annualSavingKrw = input.annualSavingKrw > 0 ? input.annualSavingKrw : elecPrice === null ? 0 : round(input.savingKwh * elecPrice, 0);
+	if (input.investmentKrw <= 0) notes.push({
+		level: "block",
+		message: "투자비가 0 입니다. 회수기간을 산출할 수 없습니다."
+	});
+	if (annualSavingKrw <= 0) notes.push({
+		level: "block",
+		message: "연간 절감액이 0 입니다. 회수기간을 산출할 수 없습니다."
+	});
+	const paybackYears = input.investmentKrw > 0 && annualSavingKrw > 0 ? round(input.investmentKrw / annualSavingKrw, 2) : 0;
+	return {
+		savingToe,
+		annualSavingKrw,
+		paybackYears,
+		numericVerified: notes.length === 0 && paybackYears > 0,
+		notes
+	};
+}
+function distribution(values) {
+	const sorted = values.filter((value) => value > 0).sort((a, b) => a - b);
+	if (!sorted.length) return {
+		count: 0,
+		min: 0,
+		p25: 0,
+		median: 0,
+		p75: 0,
+		max: 0
+	};
+	const at = (ratio) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * ratio))];
+	return {
+		count: sorted.length,
+		min: sorted[0],
+		p25: at(.25),
+		median: at(.5),
+		p75: at(.75),
+		max: sorted[sorted.length - 1]
+	};
+}
+function percentileOf(value, values) {
+	const sorted = values.filter((item) => item > 0).sort((a, b) => a - b);
+	if (!sorted.length || value <= 0) return 0;
+	const below = sorted.filter((item) => item < value).length;
+	return Math.round(below / sorted.length * 100);
+}
+function round(value, digits) {
+	const factor = 10 ** digits;
+	return Math.round(value * factor) / factor;
+}
+function diagnosisCode(input) {
+	return `dgn-${input.auditYear || (/* @__PURE__ */ new Date()).getFullYear()}-${input.facilityName.trim().toLowerCase().replace(/[^a-z0-9가-힣]+/g, "-").slice(0, 24) || "site"}`;
+}
+async function createDiagnosis(ownerId, input) {
+	const factors = await loadFactors();
+	const numbers = computeDiagnosisNumbers({
+		annualElectricityKwh: input.annualElectricityKwh ?? 0,
+		annualFuelToe: input.annualFuelToe ?? 0,
+		unitBasisValue: input.unitBasisValue ?? 0
+	}, factors);
+	const now$1 = (/* @__PURE__ */ new Date()).toISOString();
+	const [created] = await getDb().insert(diagnoses).values({
+		code: input.code?.trim() || diagnosisCode(input),
+		facilityName: input.facilityName,
+		sector: input.sector,
+		region: input.region ?? "",
+		auditYear: input.auditYear ?? 0,
+		unitBasisValue: input.unitBasisValue ?? 0,
+		unitBasisNote: input.unitBasisNote ?? getSector(input.sector).unitBasis,
+		annualElectricityKwh: input.annualElectricityKwh ?? 0,
+		annualFuelToe: input.annualFuelToe ?? 0,
+		annualEnergyToe: numbers.annualEnergyToe,
+		annualGhgTco2eq: numbers.annualGhgTco2eq,
+		energyIntensity: numbers.energyIntensity,
+		measurementBasis: input.measurementBasis ?? "documented",
+		measurementPeriod: input.measurementPeriod ?? "",
+		acl: input.acl ?? "confidential",
+		numericVerified: numbers.numericVerified,
+		wikiSlug: input.wikiSlug ?? "",
+		equipmentTags: input.equipmentTags ?? "",
+		note: input.note ?? "",
+		ownerId,
+		createdAt: now$1,
+		updatedAt: now$1
+	}).returning();
+	return {
+		diagnosis: created,
+		notes: numbers.notes
+	};
+}
+async function updateDiagnosis(code, input) {
+	const db$1 = getDb();
+	const current = await getDiagnosis(code);
+	if (!current) return null;
+	const merged = {
+		annualElectricityKwh: input.annualElectricityKwh ?? current.annualElectricityKwh,
+		annualFuelToe: input.annualFuelToe ?? current.annualFuelToe,
+		unitBasisValue: input.unitBasisValue ?? current.unitBasisValue
+	};
+	const numbers = computeDiagnosisNumbers(merged, await loadFactors());
+	const patch = {
+		updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+		...merged,
+		annualEnergyToe: numbers.annualEnergyToe,
+		annualGhgTco2eq: numbers.annualGhgTco2eq,
+		energyIntensity: numbers.energyIntensity,
+		numericVerified: numbers.numericVerified
+	};
+	for (const key of [
+		"facilityName",
+		"sector",
+		"region",
+		"auditYear",
+		"unitBasisNote",
+		"measurementBasis",
+		"measurementPeriod",
+		"acl",
+		"wikiSlug",
+		"equipmentTags",
+		"note"
+	]) if (input[key] !== void 0) patch[key] = input[key];
+	const [updated] = await db$1.update(diagnoses).set(patch).where(eq(diagnoses.id, current.id)).returning();
+	return {
+		diagnosis: updated,
+		notes: numbers.notes
+	};
+}
+async function getDiagnosis(code) {
+	return (await getDb().select().from(diagnoses).where(eq(diagnoses.code, code)).limit(1))[0] ?? null;
+}
+async function listDiagnoses(options = {}) {
+	const db$1 = getDb();
+	const filters = [];
+	if (options.sector) filters.push(eq(diagnoses.sector, options.sector));
+	if (options.year) filters.push(eq(diagnoses.auditYear, options.year));
+	const query = db$1.select().from(diagnoses);
+	return filters.length ? query.where(and(...filters)).orderBy(desc(diagnoses.auditYear), desc(diagnoses.createdAt)) : query.orderBy(desc(diagnoses.auditYear), desc(diagnoses.createdAt));
+}
+function coverageGaps(diagnosis) {
+	const profile = getSector(diagnosis.sector);
+	const filled = [];
+	if (diagnosis.annualElectricityKwh > 0) filled.push("연간 전력사용량 kWh");
+	if (diagnosis.annualFuelToe > 0) filled.push("연간 연료사용량");
+	if (diagnosis.annualEnergyToe > 0) filled.push("환산에너지 toe");
+	if (diagnosis.annualGhgTco2eq > 0) filled.push("온실가스 tCO2eq");
+	if (diagnosis.unitBasisValue > 0) filled.push(`${profile.unitBasis} 원단위 분모 연면적 생산량 처리량`);
+	if (diagnosis.energyIntensity > 0) filled.push("에너지 원단위");
+	return missingMetrics(diagnosis.sector, `${filled.join(" ")} ${diagnosis.note} ${diagnosis.equipmentTags}`);
+}
+async function addDiagnosisMeasure(diagnosisId, input) {
+	const numbers = computeMeasureNumbers({
+		savingKwh: input.savingKwh ?? 0,
+		savingToe: input.savingToe ?? 0,
+		investmentKrw: input.investmentKrw ?? 0,
+		annualSavingKrw: input.annualSavingKrw ?? 0
+	}, await loadFactors());
+	const [created] = await getDb().insert(diagnosisMeasures).values({
+		diagnosisId,
+		measureSlug: input.measureSlug,
+		savingKwh: input.savingKwh ?? 0,
+		savingToe: numbers.savingToe,
+		investmentKrw: input.investmentKrw ?? 0,
+		annualSavingKrw: numbers.annualSavingKrw,
+		paybackYears: numbers.paybackYears,
+		adopted: input.adopted ?? false,
+		adoptionNote: input.adoptionNote ?? "",
+		numericVerified: numbers.numericVerified,
+		createdAt: (/* @__PURE__ */ new Date()).toISOString()
+	}).returning();
+	return {
+		measure: created,
+		notes: numbers.notes
+	};
+}
+async function listDiagnosisMeasures(diagnosisId) {
+	return getDb().select().from(diagnosisMeasures).where(eq(diagnosisMeasures.diagnosisId, diagnosisId));
+}
+async function removeDiagnosisMeasure(id) {
+	await getDb().delete(diagnosisMeasures).where(eq(diagnosisMeasures.id, id));
+}
+async function listMeasureOutcomes() {
+	const rows = await getDb().select().from(diagnosisMeasures);
+	const map$2 = /* @__PURE__ */ new Map();
+	for (const row of rows) {
+		const entry = map$2.get(row.measureSlug) ?? {
+			cases: 0,
+			adopted: 0,
+			paybacks: []
+		};
+		entry.cases += 1;
+		if (row.adopted) entry.adopted += 1;
+		if (row.numericVerified && row.paybackYears > 0) entry.paybacks.push(row.paybackYears);
+		map$2.set(row.measureSlug, entry);
+	}
+	return map$2;
+}
+async function findSimilarDiagnoses(query) {
+	const all = await listDiagnoses();
+	const equipment = (query.equipment ?? []).map((item) => item.trim()).filter(Boolean);
+	return all.map((diagnosis) => {
+		const reasons = [];
+		let score = 0;
+		if (diagnosis.sector === query.sector) {
+			score += 3;
+			reasons.push(`동일 업종 ${getSector(diagnosis.sector).name}`);
+		}
+		if (query.unitBasisValue && query.unitBasisValue > 0 && diagnosis.unitBasisValue > 0) {
+			const ratio = diagnosis.unitBasisValue / query.unitBasisValue;
+			if (ratio >= .5 && ratio <= 2) {
+				score += 2;
+				reasons.push("규모 ±2배 이내");
+			}
+		}
+		const haystack = `${diagnosis.equipmentTags} ${diagnosis.note}`.toLowerCase();
+		for (const item of equipment) if (haystack.includes(item.toLowerCase())) {
+			score += 1;
+			reasons.push(item);
+		}
+		return {
+			diagnosis,
+			score,
+			reasons
+		};
+	}).filter((hit) => hit.score > 0).sort((a, b) => b.score - a.score).slice(0, 20);
+}
+async function sectorBenchmark(sector, targetIntensity) {
+	const rows = (await listDiagnoses({ sector })).filter((row) => row.numericVerified && row.energyIntensity > 0);
+	const values = rows.map((row) => row.energyIntensity);
+	return {
+		sector,
+		sectorName: getSector(sector).name,
+		unitBasis: getSector(sector).unitBasis,
+		distribution: distribution(values),
+		percentile: targetIntensity ? percentileOf(targetIntensity, values) : null,
+		samples: rows.map((row) => ({
+			code: row.code,
+			facilityName: row.facilityName,
+			auditYear: row.auditYear,
+			energyIntensity: row.energyIntensity
+		}))
+	};
+}
+var diagnoses_route_exports = /* @__PURE__ */ __export({ diagnosesRouter: () => diagnosesRouter }, 1);
+const diagnosesRouter = new Hono();
+var SectorEnum = _enum(SECTOR_CODES);
+var DiagnosisSchema = object$1({
+	code: string$2().trim().max(80).optional(),
+	facilityName: string$2().trim().min(1).max(120),
+	sector: SectorEnum,
+	region: string$2().trim().max(40).optional(),
+	auditYear: number$2().int().min(1990).max(2100).optional(),
+	unitBasisValue: number$2().min(0).optional(),
+	unitBasisNote: string$2().trim().max(80).optional(),
+	annualElectricityKwh: number$2().min(0).optional(),
+	annualFuelToe: number$2().min(0).optional(),
+	measurementBasis: _enum([
+		"measured",
+		"estimated",
+		"design",
+		"documented"
+	]).optional(),
+	measurementPeriod: string$2().trim().max(60).optional(),
+	acl: _enum([
+		"public",
+		"internal",
+		"confidential",
+		"restricted"
+	]).optional(),
+	wikiSlug: string$2().trim().max(80).optional(),
+	equipmentTags: string$2().trim().max(200).optional(),
+	note: string$2().trim().max(2e3).optional()
+});
+var MeasureSchema = object$1({
+	measureSlug: string$2().trim().min(1).max(80),
+	savingKwh: number$2().min(0).optional(),
+	savingToe: number$2().min(0).optional(),
+	investmentKrw: number$2().min(0).optional(),
+	annualSavingKrw: number$2().min(0).optional(),
+	adopted: boolean$2().optional(),
+	adoptionNote: string$2().trim().max(400).optional()
+});
+function fail$4(c, error$51) {
+	const failure = toDatabaseFailure(error$51);
+	if (failure) return c.json(failure.body, failure.status);
+	throw error$51;
+}
+var listHandler$3 = async (c) => {
+	try {
+		const year$1 = Number(c.req.query("year"));
+		const rows = await listDiagnoses({
+			sector: c.req.query("sector") || void 0,
+			year: Number.isFinite(year$1) && year$1 > 0 ? year$1 : void 0
+		});
+		return c.json(apiSuccess({ diagnoses: rows }), 200);
+	} catch (error$51) {
+		return fail$4(c, error$51);
+	}
+};
+diagnosesRouter.get("", staffRoute, listHandler$3);
+diagnosesRouter.get("/", staffRoute, listHandler$3);
+var createHandler$5 = async (c) => {
+	const parsed = DiagnosisSchema.safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success) return c.json(invalidInput("진단 건 입력값을 확인해 주세요."), 400);
+	try {
+		return c.json(apiSuccess(await createDiagnosis(c.var.currentUser.id, parsed.data)), 200);
+	} catch (error$51) {
+		return fail$4(c, error$51);
+	}
+};
+diagnosesRouter.post("", staffRoute, createHandler$5);
+diagnosesRouter.post("/", staffRoute, createHandler$5);
+diagnosesRouter.post("/similar", staffRoute, async (c) => {
+	const parsed = object$1({
+		sector: SectorEnum,
+		unitBasisValue: number$2().min(0).optional(),
+		equipment: array$1(string$2().trim().max(40)).max(20).optional()
+	}).safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success) return c.json(invalidInput("업종을 선택해 주세요."), 400);
+	try {
+		return c.json(apiSuccess({ matches: await findSimilarDiagnoses(parsed.data) }), 200);
+	} catch (error$51) {
+		return fail$4(c, error$51);
+	}
+});
+diagnosesRouter.get("/benchmark", staffRoute, async (c) => {
+	const sector = c.req.query("sector") ?? "";
+	if (!SECTOR_CODES.includes(sector)) return c.json(invalidInput("업종 코드가 올바르지 않습니다."), 400);
+	const target = Number(c.req.query("intensity"));
+	try {
+		const report = await sectorBenchmark(sector, Number.isFinite(target) && target > 0 ? target : void 0);
+		return c.json(apiSuccess({ report }), 200);
+	} catch (error$51) {
+		return fail$4(c, error$51);
+	}
+});
+diagnosesRouter.get("/:code", staffRoute, async (c) => {
+	try {
+		const diagnosis = await getDiagnosis(c.req.param("code"));
+		if (!diagnosis) return c.json(apiFailure("NOT_FOUND", "진단 건을 찾을 수 없습니다."), 404);
+		return c.json(apiSuccess({
+			diagnosis,
+			measures: await listDiagnosisMeasures(diagnosis.id),
+			gaps: coverageGaps(diagnosis)
+		}), 200);
+	} catch (error$51) {
+		return fail$4(c, error$51);
+	}
+});
+diagnosesRouter.patch("/:code", staffRoute, async (c) => {
+	const parsed = DiagnosisSchema.partial().safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success || Object.keys(parsed.data).length === 0) return c.json(invalidInput("변경할 항목이 없습니다."), 400);
+	try {
+		const result = await updateDiagnosis(c.req.param("code"), parsed.data);
+		if (!result) return c.json(apiFailure("NOT_FOUND", "진단 건을 찾을 수 없습니다."), 404);
+		return c.json(apiSuccess(result), 200);
+	} catch (error$51) {
+		return fail$4(c, error$51);
+	}
+});
+diagnosesRouter.post("/:code/measures", staffRoute, async (c) => {
+	const parsed = MeasureSchema.safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success) return c.json(invalidInput("개선안 입력값을 확인해 주세요."), 400);
+	try {
+		const diagnosis = await getDiagnosis(c.req.param("code"));
+		if (!diagnosis) return c.json(apiFailure("NOT_FOUND", "진단 건을 찾을 수 없습니다."), 404);
+		return c.json(apiSuccess(await addDiagnosisMeasure(diagnosis.id, parsed.data)), 200);
+	} catch (error$51) {
+		return fail$4(c, error$51);
+	}
+});
+diagnosesRouter.delete("/:code/measures/:id", staffRoute, async (c) => {
+	try {
+		await removeDiagnosisMeasure(c.req.param("id"));
+		return c.json(apiSuccess({ id: c.req.param("id") }), 200);
+	} catch (error$51) {
+		return fail$4(c, error$51);
+	}
+});
 var MessageServiceError = class extends Error {
 	constructor(message$1, status, code) {
 		super(message$1);
@@ -44928,6 +46199,153 @@ var healthHandler = (c) => {
 healthRouter.get("/", healthHandler);
 healthRouter.get("", healthHandler);
 healthRouter.get("/*", healthHandler);
+async function createSolarApplication(userId, input) {
+	const now$1 = (/* @__PURE__ */ new Date()).toISOString();
+	const [created] = await getDb().insert(solarApplications).values({
+		userId,
+		applicantName: input.applicantName,
+		phone: input.phone,
+		email: input.email,
+		postalCode: input.postalCode ?? "",
+		address: input.address,
+		buildingType: input.buildingType,
+		balconyDirection: input.balconyDirection,
+		balconyWidth: input.balconyWidth ?? "",
+		monthlyBill: input.monthlyBill ?? 0,
+		packageId: input.packageId ?? "",
+		packageName: input.packageName ?? "",
+		quantity: input.quantity ?? 1,
+		visitPreference: input.visitPreference ?? "",
+		note: input.note ?? "",
+		privacyAgreed: input.privacyAgreed,
+		createdAt: now$1,
+		updatedAt: now$1
+	}).returning();
+	return created;
+}
+async function listMySolarApplications(userId) {
+	return getDb().select().from(solarApplications).where(eq(solarApplications.userId, userId)).orderBy(desc(solarApplications.createdAt));
+}
+async function listSolarApplications(status) {
+	const query = getDb().select({
+		application: solarApplications,
+		customerName: user.name,
+		customerEmail: user.email
+	}).from(solarApplications).leftJoin(user, eq(user.id, solarApplications.userId));
+	return (status ? await query.where(eq(solarApplications.status, status)).orderBy(desc(solarApplications.createdAt)) : await query.orderBy(desc(solarApplications.createdAt))).map((row) => ({
+		...row.application,
+		customerName: row.customerName,
+		customerEmail: row.customerEmail
+	}));
+}
+async function updateSolarApplication(id, patch) {
+	const [updated] = await getDb().update(solarApplications).set({
+		...patch,
+		updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+	}).where(eq(solarApplications.id, id)).returning();
+	return updated ?? null;
+}
+async function createInquiry(userId, input) {
+	const now$1 = (/* @__PURE__ */ new Date()).toISOString();
+	const [created] = await getDb().insert(inquiries).values({
+		userId,
+		type: input.type,
+		name: input.name,
+		company: input.company ?? "",
+		phone: input.phone ?? "",
+		email: input.email,
+		message: input.message,
+		createdAt: now$1,
+		updatedAt: now$1
+	}).returning();
+	return created;
+}
+async function listInquiries(status) {
+	const query = getDb().select().from(inquiries);
+	return status ? query.where(eq(inquiries.status, status)).orderBy(desc(inquiries.createdAt)) : query.orderBy(desc(inquiries.createdAt));
+}
+async function listMyInquiries(userId) {
+	return getDb().select().from(inquiries).where(and(eq(inquiries.userId, userId))).orderBy(desc(inquiries.createdAt));
+}
+async function updateInquiry(id, patch) {
+	const [updated] = await getDb().update(inquiries).set({
+		...patch,
+		updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+	}).where(eq(inquiries.id, id)).returning();
+	return updated ?? null;
+}
+var inquiries_route_exports = /* @__PURE__ */ __export({ inquiriesRouter: () => inquiriesRouter }, 1);
+const inquiriesRouter = new Hono();
+var InquirySchema = object$1({
+	type: string$2().trim().min(1).max(40),
+	name: string$2().trim().min(1).max(40),
+	company: string$2().trim().max(80).optional(),
+	phone: string$2().trim().max(20).optional(),
+	email: string$2().trim().email(),
+	message: string$2().trim().min(5).max(4e3),
+	privacyAgreed: literal(true)
+});
+var UpdateSchema$1 = object$1({
+	status: _enum([
+		"received",
+		"handling",
+		"done"
+	]).optional(),
+	assigneeId: string$2().trim().max(64).nullable().optional(),
+	staffMemo: string$2().trim().max(2e3).optional()
+});
+function fail$3(c, error$51) {
+	const failure = toDatabaseFailure(error$51);
+	if (failure) return c.json(failure.body, failure.status);
+	throw error$51;
+}
+var createHandler$4 = async (c) => {
+	const parsed = InquirySchema.safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success) return c.json(invalidInput("문의 내용을 다시 확인해 주세요."), 400);
+	const { type, name, company, phone, email: email$2, message: message$1 } = parsed.data;
+	try {
+		return c.json(apiSuccess({ inquiry: await createInquiry(c.var.user?.id ?? null, {
+			type,
+			name,
+			company,
+			phone,
+			email: email$2,
+			message: message$1
+		}) }), 200);
+	} catch (error$51) {
+		return fail$3(c, error$51);
+	}
+};
+inquiriesRouter.post("", publicRoute, createHandler$4);
+inquiriesRouter.post("/", publicRoute, createHandler$4);
+inquiriesRouter.get("/mine", protectedRoute, async (c) => {
+	try {
+		return c.json(apiSuccess({ inquiries: await listMyInquiries(c.var.currentUser.id) }), 200);
+	} catch (error$51) {
+		return fail$3(c, error$51);
+	}
+});
+var staffListHandler$1 = async (c) => {
+	const status = c.req.query("status");
+	try {
+		return c.json(apiSuccess({ inquiries: await listInquiries(status || void 0) }), 200);
+	} catch (error$51) {
+		return fail$3(c, error$51);
+	}
+};
+inquiriesRouter.get("", staffRoute, staffListHandler$1);
+inquiriesRouter.get("/", staffRoute, staffListHandler$1);
+inquiriesRouter.patch("/:id", staffRoute, async (c) => {
+	const parsed = UpdateSchema$1.safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success || Object.keys(parsed.data).length === 0) return c.json(invalidInput("변경할 항목이 없습니다."), 400);
+	try {
+		const inquiry = await updateInquiry(c.req.param("id"), parsed.data);
+		if (!inquiry) return c.json(apiFailure("NOT_FOUND", "문의 건을 찾을 수 없습니다."), 404);
+		return c.json(apiSuccess({ inquiry }), 200);
+	} catch (error$51) {
+		return fail$3(c, error$51);
+	}
+});
 var me_route_exports = /* @__PURE__ */ __export({ meRouter: () => meRouter }, 1);
 const meRouter = new Hono();
 meRouter.get("/profile", protectedRoute, (c) => {
@@ -44940,6 +46358,891 @@ meRouter.get("/profile", protectedRoute, (c) => {
 		role: user$1.role,
 		username: user$1.username
 	} }), 200);
+});
+var IMAGE = {
+	data: "/images/img_021051fca69c.jpg",
+	esco: "/images/img_b9f7786d0417.jpg",
+	renewable: "/images/img_714682f9a953.jpg",
+	insight: "/images/img_993a9934b456.jpg",
+	balcony: "/images/img_f9285b14f8f4.jpg"
+};
+var SEED_POSTS = [
+	{
+		slug: "energy-audit-getting-started",
+		type: "blog",
+		title: "에너지 진단, 어디서부터 시작해야 할까?",
+		summary: "진단 전 준비자료와 현장 체크포인트를 한 번에 정리했습니다.",
+		tag: "에너지진단",
+		duration: "5분 읽기",
+		coverImage: IMAGE.insight,
+		body: "에너지 진단은 '무엇을 측정할 수 있는가'에서 출발합니다.\n\n최근 1~2년치 전기·가스·유류 사용량, 주요 설비 목록과 정격, 운전 시간표만 준비되어도 1차 분석이 가능합니다.\n\n현장에서는 보일러·냉동기 효율, 공조 운전시간, 압축공기 누설, 조명 점등 패턴을 우선 확인합니다.\n\n진단 결과는 절감량과 투자비, 회수기간이 함께 제시되어야 실행으로 이어집니다."
+	},
+	{
+		slug: "balcony-solar-install-steps",
+		type: "shorts",
+		title: "30초로 보는 발코니 태양광 설치 순서",
+		summary: "현장 확인부터 배치·계통 검토까지 핵심 흐름을 짧게 확인하세요.",
+		tag: "태양광",
+		duration: "00:30",
+		coverImage: IMAGE.balcony,
+		body: "① 발코니 방향·그늘 확인 → ② 난간 구조와 고정 방식 검토 → ③ 모듈 배치 설계 → ④ 인버터·계통 연결 검토 → ⑤ 설치 및 발전 확인."
+	},
+	{
+		slug: "esco-lowers-capex",
+		type: "blog",
+		title: "ESCO가 시설 투자 부담을 낮추는 방식",
+		summary: "성과 기반 에너지 효율화 사업의 구조를 실무 관점에서 설명합니다.",
+		tag: "ESCO",
+		duration: "6분 읽기",
+		coverImage: IMAGE.esco,
+		body: "ESCO 사업은 절감으로 생긴 현금흐름으로 투자비를 회수하는 구조입니다.\n\n핵심은 절감량을 어떻게 측정·검증(M&V)할 것인지 사전에 합의하는 데 있습니다.\n\n기준연도 사용량, 보정 변수(생산량·외기온도), 정산 주기를 계약서에 명시해야 분쟁이 없습니다."
+	},
+	{
+		slug: "three-signs-of-energy-loss",
+		type: "shorts",
+		title: "우리 건물의 에너지 손실 신호 3가지",
+		summary: "운전시간, 피크부하, 설비 효율에서 확인할 수 있는 징후입니다.",
+		tag: "효율화",
+		duration: "00:45",
+		coverImage: IMAGE.data,
+		body: "① 사용하지 않는 시간대의 기저부하가 높다 ② 매달 같은 시간대에 피크가 반복된다 ③ 설비 부하율이 30% 밑에서 계속 운전된다."
+	},
+	{
+		slug: "renewable-selection-guide",
+		type: "blog",
+		title: "태양광·태양열·연료전지, 현장별 선택 기준",
+		summary: "공간과 부하 패턴, 유지관리 조건에 맞춰 비교하는 방법입니다.",
+		tag: "신재생",
+		duration: "7분 읽기",
+		coverImage: IMAGE.renewable,
+		body: "전기 부하가 크고 지붕 면적이 넓다면 태양광, 급탕 부하가 연중 일정하면 태양열, 열과 전기를 동시에 쓰고 공간이 제한적이면 연료전지가 유리합니다.\n\n선택 기준은 설치 면적, 부하 패턴, 유지관리 인력, 지원제도 네 가지로 압축됩니다."
+	},
+	{
+		slug: "peak-shaving-with-data",
+		type: "shorts",
+		title: "데이터로 찾는 전력 피크 절감 포인트",
+		summary: "짧은 데이터 분석으로 먼저 확인할 수 있는 운영 개선 포인트입니다.",
+		tag: "데이터",
+		duration: "00:40",
+		coverImage: IMAGE.insight,
+		body: "15분 단위 수요 데이터만 있어도 피크가 발생하는 요일·시간대와 원인 설비를 좁힐 수 있습니다."
+	}
+];
+async function seedStarterContent(authorId) {
+	const db$1 = getDb();
+	const now$1 = (/* @__PURE__ */ new Date()).toISOString();
+	let createdPosts = 0;
+	for (const seed of SEED_POSTS) {
+		if ((await db$1.select({ id: posts.id }).from(posts).where(eq(posts.slug, seed.slug)).limit(1))[0]) continue;
+		await db$1.insert(posts).values({
+			...seed,
+			status: "published",
+			authorId,
+			publishedAt: now$1,
+			createdAt: now$1,
+			updatedAt: now$1
+		});
+		createdPosts += 1;
+	}
+	return { createdPosts };
+}
+var SEED_PAGES = [
+	{
+		slug: "ecm-waste-heat-recovery-boiler",
+		type: "measure",
+		title: "폐열회수 — 보일러 배가스 이코노마이저",
+		summary: "보일러 배가스의 현열을 급수 예열에 회수해 연료 사용량을 줄이는 개선안.",
+		tags: "폐열회수, 보일러, 이코노마이저, 산업체",
+		sector: "chemical",
+		acl: "internal",
+		status: "reviewed",
+		sourceRef: "ETS 진단 표준 개선안 카탈로그 (초판)",
+		owner: "에너지진단팀",
+		confidence: "high",
+		body: `## 요약
+보일러 배가스의 현열을 급수 예열에 회수하여 연료 사용량을 저감하는 개선안.
+
+## 적용 조건
+- 배가스 온도가 충분히 높을 것 (현장 실측으로 확인)
+- 연간 가동시간이 길 것
+- 급수 온도가 낮아 예열 여지가 있을 것
+- 배관 경로와 설치 공간 확보 가능
+
+## 산출 근거
+| 항목 | 산출 방법 | 출처 |
+|---|---|---|
+| 회수 열량 | 배가스 유량 × 비열 × 온도강하 | 현장 실측값 |
+| 연료 절감량 | 회수 열량 ÷ 보일러 효율 | [[reg-energy-conversion-factors]] |
+| 회수기간 | 투자비 ÷ 연간 절감액 | 계산 엔진 (services/energy-calc.ts) |
+
+> 수치는 이 페이지에서 생성하지 않는다. 실제 값은 진단 건의 개선안 실적에서 계산되며,
+> 검산을 통과한 값만 서비스 응답에 인용된다.
+
+## 검토 시 흔한 함정
+- 배가스 노점 이하로 냉각하면 저온부식이 발생한다. 산노점 확인 필수.
+- 가동시간이 짧으면 회수기간이 급격히 늘어난다. 실가동 시간표를 받아야 한다.
+
+## 관련
+[[eqp-steam-boiler]] · [[cpt-payback-drivers]] · [[mtr-energy-intensity]]`
+	},
+	{
+		slug: "ecm-inverter-control-fan-pump",
+		type: "measure",
+		title: "송풍기·펌프 인버터 제어 도입",
+		summary: "댐퍼·밸브 교축으로 유량을 조절하던 설비에 인버터를 적용해 저부하 구간 소비전력을 줄이는 개선안.",
+		tags: "인버터, 송풍기, 펌프, VFD, 전력",
+		sector: "water",
+		acl: "internal",
+		status: "reviewed",
+		sourceRef: "ETS 진단 표준 개선안 카탈로그 (초판)",
+		owner: "에너지진단팀",
+		confidence: "high",
+		body: `## 요약
+정속 운전 중 댐퍼·밸브로 유량을 줄이던 송풍기·펌프에 인버터를 적용한다.
+유량 변화에 대해 축동력이 3승으로 감소하는 상사법칙이 절감의 근거다.
+
+## 적용 조건
+- 부하 변동이 있고 저부하 운전 시간이 길 것
+- 교축(댐퍼·밸브 조임) 방식으로 유량을 조절하고 있을 것
+- 모터 절연·배선이 인버터 적용에 적합할 것
+
+## 산출 근거
+| 항목 | 산출 방법 | 출처 |
+|---|---|---|
+| 절감 전력량 | 부하율별 운전시간 × 상사법칙 축동력 차 | 현장 계측 |
+| 절감액 | 절감 전력량 × 계약 전력단가 | [[reg-energy-conversion-factors]] |
+
+## 검토 시 흔한 함정
+- 정격 부근에서만 운전되면 절감이 거의 없다. 부하 프로파일을 먼저 본다.
+- 인버터 손실(약 2~3%)과 고조파 대책 비용을 투자비에 포함해야 한다.
+
+## 관련
+[[cpt-payback-drivers]] · [[mtr-energy-intensity]]`
+	},
+	{
+		slug: "ecm-compressed-air-leak",
+		type: "measure",
+		title: "압축공기 누설 저감",
+		summary: "압축공기 배관·이음부 누설을 찾아 막아 공기압축기 부하시간을 줄이는 저비용 개선안.",
+		tags: "압축공기, 누설, 컴프레서, 저비용",
+		sector: "machinery",
+		acl: "internal",
+		status: "reviewed",
+		sourceRef: "ETS 진단 표준 개선안 카탈로그 (초판)",
+		owner: "에너지진단팀",
+		confidence: "medium",
+		body: `## 요약
+비가동 시간대 압축기 부하 운전으로 누설량을 추정하고, 초음파 탐지로 누설점을 찾아 보수한다.
+
+## 적용 조건
+- 압축공기를 상시 사용하는 공정
+- 비가동 시간대에도 압축기가 주기적으로 기동하는 경우
+
+## 산출 근거
+| 항목 | 산출 방법 | 출처 |
+|---|---|---|
+| 누설률 | 비가동 시 부하시간 ÷ (부하+무부하 시간) | 현장 계측 |
+| 절감 전력량 | 누설률 × 압축기 소비전력 × 가동시간 | 현장 계측 |
+
+## 검토 시 흔한 함정
+- 투자비가 작아 회수기간이 짧게 나오지만, 보수하지 않으면 1~2년 내 원래대로 돌아온다.
+  정기 점검 주기를 함께 제안해야 실효가 있다.
+
+## 관련
+[[cpt-payback-drivers]]`
+	},
+	{
+		slug: "eqp-steam-boiler",
+		type: "equipment",
+		title: "증기 보일러 (관류형 · 노통연관식)",
+		summary: "산업 현장에서 가장 흔한 열원 설비. 배가스 온도·공기비·부하율이 진단 핵심 지표다.",
+		tags: "보일러, 증기, 열원",
+		sector: "chemical",
+		acl: "internal",
+		status: "reviewed",
+		sourceRef: "ETS 설비 카탈로그",
+		owner: "에너지진단팀",
+		confidence: "high",
+		body: `## 점검 지표
+- 배가스 온도, 공기비(O2 농도), 표면 열손실
+- 부하율 및 단속 운전 여부
+- 응축수 회수율, 블로다운 비율
+
+## 자주 도출되는 개선안
+- [[ecm-waste-heat-recovery-boiler]]
+- 공기비 최적화, 응축수 회수 확대, 보온 보강
+
+## 진단 시 확보할 자료
+운전일지, 연료 구매 내역, 급수·응축수 계통도, 최근 연소 분석 결과.`
+	},
+	{
+		slug: "reg-energy-conversion-factors",
+		type: "regulation",
+		title: "에너지 열량 환산기준 및 배출계수",
+		summary: "연료·전력 사용량을 toe·tCO2eq 로 환산할 때 적용하는 기준. 개정 시 이 문서와 계수 표를 함께 갱신한다.",
+		tags: "법규, 환산계수, toe, 배출계수",
+		sector: "other",
+		acl: "public",
+		status: "draft",
+		sourceRef: "에너지법 시행규칙 별표 · 국가 온실가스 배출계수 고시 (원문 확인 필요)",
+		owner: "에너지진단팀",
+		validUntil: "2026-12-31",
+		confidence: "low",
+		body: `## 사용 원칙
+환산계수는 개정 주기가 있으므로 **반드시 최신 고시 원문을 인용**한다.
+값 자체는 이 문서가 아니라 계수 표(SSOT)에서 관리하며, 계산은 검증된 함수만 수행한다.
+
+## 갱신 절차
+1. 고시 원문에서 값을 확인한다.
+2. 업무 포털 → LLM Wiki → 환산계수 화면에서 값·출처·유효기간을 입력하고 '확인' 처리한다.
+3. 확인되지 않은 계수를 쓴 계산은 전부 미검증으로 표시되며 서비스 응답에 인용되지 않는다.
+
+## 주의
+계수를 바꾸면 과거 진단 건의 환산값도 재계산 대상이 된다. 갱신 후 진단 목록에서 재계산을 실행한다.`
+	},
+	{
+		slug: "mtr-energy-intensity",
+		type: "metric",
+		title: "에너지 원단위 (energy intensity)",
+		summary: "연간 환산에너지(toe)를 업종별 분모로 나눈 값. 분모가 다르면 서로 비교할 수 없다.",
+		tags: "원단위, 벤치마크, 지표",
+		sector: "other",
+		acl: "internal",
+		status: "reviewed",
+		sourceRef: "ETS 진단 지표 정의서",
+		owner: "에너지진단팀",
+		confidence: "high",
+		body: `## 정의
+에너지 원단위 = 연간 환산에너지사용량(toe) ÷ 업종별 분모
+
+## 업종별 분모
+분모는 업종 택소노미에 고정되어 있다. 건물은 연면적, 제조업은 생산량,
+수처리는 처리수량이 분모다. **분모가 다른 업종끼리 원단위를 비교하면 안 된다.**
+
+## 사용 주의
+- 측정근거(measured / estimated / design)가 다른 값을 한 분포에 섞지 않는다.
+- 검산을 통과한 진단 건만 벤치마크 분포에 들어간다.
+
+## 관련
+[[cpt-payback-drivers]]`
+	},
+	{
+		slug: "cpt-payback-drivers",
+		type: "concept",
+		title: "회수기간을 결정하는 세 가지 변수",
+		summary: "가동시간, 부하 프로파일, 에너지 단가. 설비 사양보다 이 셋이 회수기간을 더 크게 움직인다.",
+		tags: "회수기간, 인사이트, 투자판단",
+		sector: "other",
+		acl: "internal",
+		status: "draft",
+		sourceRef: "진단 사례 누적 관찰 (검증 진행 중)",
+		owner: "에너지진단팀",
+		confidence: "medium",
+		body: `## 관찰
+같은 개선안이라도 사업장에 따라 회수기간이 크게 갈린다. 반복되는 원인은 셋이다.
+
+1. **연간 가동시간** — 절감액은 가동시간에 비례한다. 가동시간이 절반이면 회수기간은 두 배다.
+2. **부하 프로파일** — 정격 부근에서만 운전되면 인버터류 개선안의 절감 여지가 사라진다.
+3. **에너지 단가** — 계약종별 단가와 연료 구매단가가 절감액을 좌우한다.
+
+## 진단 착수 시 먼저 받을 자료
+운전 시간표, 15분 단위 수요 데이터, 최근 12개월 에너지 구매 내역.
+
+## 관련
+[[ecm-waste-heat-recovery-boiler]] · [[ecm-inverter-control-fan-pump]] · [[mtr-energy-intensity]]`
+	}
+];
+async function seedWikiStarter(ownerId) {
+	const db$1 = getDb();
+	const now$1 = (/* @__PURE__ */ new Date()).toISOString();
+	let createdWiki = 0;
+	await ensureFactors();
+	for (const seed of SEED_PAGES) {
+		if ((await db$1.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.slug, seed.slug)).limit(1))[0]) continue;
+		const [created] = await db$1.insert(wikiPages).values({
+			slug: seed.slug,
+			type: seed.type,
+			title: seed.title,
+			summary: seed.summary,
+			body: seed.body,
+			tags: seed.tags,
+			acl: seed.acl,
+			status: seed.status,
+			sourceRef: seed.sourceRef,
+			ownerId,
+			version: 1,
+			sector: seed.sector,
+			measurementBasis: "documented",
+			measurementPeriod: "",
+			confidence: seed.confidence,
+			numericVerified: false,
+			owner: seed.owner,
+			validUntil: seed.validUntil ?? "",
+			contentHash: "",
+			ingestedBy: "seed",
+			ingestedAt: now$1,
+			pipelineVersion: "wiki-v2-seed",
+			createdAt: now$1,
+			updatedAt: now$1
+		}).returning();
+		await db$1.insert(wikiRevisions).values({
+			pageId: created.id,
+			version: 1,
+			title: created.title,
+			body: created.body,
+			note: "스타터 킷",
+			editorId: ownerId,
+			createdAt: now$1
+		});
+		createdWiki += 1;
+	}
+	const createdDiagnoses = await seedDiagnoses(ownerId);
+	return {
+		createdWiki,
+		createdDiagnoses
+	};
+}
+var SEED_DIAGNOSES = [
+	{
+		code: "dgn-2025-sample-water-a",
+		facilityName: "[예시] A 하수처리장",
+		sector: "water",
+		region: "경기",
+		auditYear: 2025,
+		unitBasisValue: 3650,
+		annualElectricityKwh: 42e5,
+		annualFuelToe: 0,
+		equipmentTags: "송풍기, 펌프, 탈수기",
+		note: "예시 데이터입니다. 실제 진단 자료로 교체하세요.",
+		measures: [{
+			measureSlug: "ecm-inverter-control-fan-pump",
+			savingKwh: 32e4,
+			investmentKrw: 78e6,
+			adopted: true
+		}]
+	},
+	{
+		code: "dgn-2025-sample-machinery-b",
+		facilityName: "[예시] B 기계부품 공장",
+		sector: "machinery",
+		region: "충남",
+		auditYear: 2025,
+		unitBasisValue: 12e4,
+		annualElectricityKwh: 68e5,
+		annualFuelToe: 120,
+		equipmentTags: "압축기, 공조기, 사출기",
+		note: "예시 데이터입니다. 실제 진단 자료로 교체하세요.",
+		measures: [{
+			measureSlug: "ecm-compressed-air-leak",
+			savingKwh: 18e4,
+			investmentKrw: 12e6,
+			adopted: true
+		}, {
+			measureSlug: "ecm-inverter-control-fan-pump",
+			savingKwh: 95e3,
+			investmentKrw: 41e6,
+			adopted: false
+		}]
+	},
+	{
+		code: "dgn-2024-sample-chemical-c",
+		facilityName: "[예시] C 화학 플랜트",
+		sector: "chemical",
+		region: "전남",
+		auditYear: 2024,
+		unitBasisValue: 45e3,
+		annualElectricityKwh: 91e5,
+		annualFuelToe: 1450,
+		equipmentTags: "보일러, 열교환기, 압축기",
+		note: "예시 데이터입니다. 실제 진단 자료로 교체하세요.",
+		measures: [{
+			measureSlug: "ecm-waste-heat-recovery-boiler",
+			savingToe: 210,
+			annualSavingKrw: 19e7,
+			investmentKrw: 43e7,
+			adopted: true
+		}]
+	}
+];
+async function seedDiagnoses(ownerId) {
+	const db$1 = getDb();
+	const now$1 = (/* @__PURE__ */ new Date()).toISOString();
+	const factors = await loadFactors();
+	let created = 0;
+	for (const seed of SEED_DIAGNOSES) {
+		if ((await db$1.select({ id: diagnoses.id }).from(diagnoses).where(eq(diagnoses.code, seed.code)).limit(1))[0]) continue;
+		const numbers = computeDiagnosisNumbers({
+			annualElectricityKwh: seed.annualElectricityKwh,
+			annualFuelToe: seed.annualFuelToe,
+			unitBasisValue: seed.unitBasisValue
+		}, factors);
+		const [diagnosis] = await db$1.insert(diagnoses).values({
+			code: seed.code,
+			facilityName: seed.facilityName,
+			sector: seed.sector,
+			region: seed.region,
+			auditYear: seed.auditYear,
+			unitBasisValue: seed.unitBasisValue,
+			unitBasisNote: "",
+			annualElectricityKwh: seed.annualElectricityKwh,
+			annualFuelToe: seed.annualFuelToe,
+			annualEnergyToe: numbers.annualEnergyToe,
+			annualGhgTco2eq: numbers.annualGhgTco2eq,
+			energyIntensity: numbers.energyIntensity,
+			measurementBasis: "estimated",
+			measurementPeriod: `${seed.auditYear}-01 ~ ${seed.auditYear}-12`,
+			acl: "internal",
+			numericVerified: numbers.numericVerified,
+			equipmentTags: seed.equipmentTags,
+			note: seed.note,
+			ownerId,
+			createdAt: now$1,
+			updatedAt: now$1
+		}).returning();
+		for (const measure of seed.measures) {
+			const computed = computeMeasureNumbers({
+				savingKwh: "savingKwh" in measure ? measure.savingKwh : 0,
+				savingToe: "savingToe" in measure ? measure.savingToe : 0,
+				investmentKrw: measure.investmentKrw,
+				annualSavingKrw: "annualSavingKrw" in measure ? measure.annualSavingKrw : 0
+			}, factors);
+			await db$1.insert(diagnosisMeasures).values({
+				diagnosisId: diagnosis.id,
+				measureSlug: measure.measureSlug,
+				savingKwh: "savingKwh" in measure ? measure.savingKwh : 0,
+				savingToe: computed.savingToe,
+				investmentKrw: measure.investmentKrw,
+				annualSavingKrw: computed.annualSavingKrw,
+				paybackYears: computed.paybackYears,
+				adopted: measure.adopted,
+				adoptionNote: "",
+				numericVerified: computed.numericVerified,
+				createdAt: now$1
+			});
+		}
+		created += 1;
+	}
+	return created;
+}
+var STAFF_DEPARTMENTS = [
+	"에너지진단팀",
+	"에너지진단팀",
+	"에너지진단팀",
+	"ESCO사업팀",
+	"ESCO사업팀",
+	"신재생사업팀",
+	"신재생사업팀",
+	"데이터·디지털팀",
+	"데이터·디지털팀",
+	"경영지원팀"
+];
+function staffRoster() {
+	const domain$1 = env.STAFF_EMAIL_DOMAIN;
+	return [...STAFF_DEPARTMENTS.map((department, index$1) => {
+		const username$1 = `ets${String(index$1).padStart(2, "0")}`;
+		return {
+			username: username$1,
+			name: `ETS 직원 ${String(index$1).padStart(2, "0")}`,
+			email: `${username$1}@${domain$1}`,
+			password: env.STAFF_DEFAULT_PASSWORD,
+			role: "user",
+			department
+		};
+	}), {
+		username: "admin",
+		name: "ETS 관리자",
+		email: `admin@${domain$1}`,
+		password: env.STAFF_ADMIN_PASSWORD,
+		role: "admin",
+		department: "경영지원팀"
+	}];
+}
+var StaffPasswordMissingError = class extends Error {
+	constructor() {
+		super("STAFF_DEFAULT_PASSWORD 와 STAFF_ADMIN_PASSWORD 를 주입해야 임직원 계정을 만들 수 있습니다. 코드에 기본 비밀번호를 두지 않습니다.");
+		this.name = "StaffPasswordMissingError";
+	}
+};
+async function ensureStaffAccounts() {
+	if (!env.STAFF_DEFAULT_PASSWORD.trim() || !env.STAFF_ADMIN_PASSWORD.trim()) throw new StaffPasswordMissingError();
+	const auth = getAuth();
+	const db$1 = getDb();
+	const outcomes = [];
+	for (const seed of staffRoster()) {
+		const existing = await db$1.select().from(user).where(eq(user.email, seed.email)).limit(1);
+		let created = false;
+		if (!existing[0]) {
+			await auth.api.signUpEmail({ body: {
+				name: seed.name,
+				email: seed.email,
+				password: seed.password
+			} });
+			created = true;
+		}
+		await db$1.update(user).set({
+			username: seed.username,
+			displayUsername: seed.username,
+			role: seed.role,
+			memberType: "staff",
+			department: seed.department,
+			emailVerified: true,
+			updatedAt: /* @__PURE__ */ new Date()
+		}).where(eq(user.email, seed.email));
+		outcomes.push({
+			username: seed.username,
+			email: seed.email,
+			created,
+			role: seed.role
+		});
+	}
+	return outcomes;
+}
+async function staffAccountCount() {
+	return (await getDb().select({ id: user.id }).from(user).where(eq(user.memberType, "staff"))).length;
+}
+var members_route_exports = /* @__PURE__ */ __export({ membersRouter: () => membersRouter }, 1);
+const membersRouter = new Hono();
+membersRouter.get("/me", protectedRoute, async (c) => {
+	try {
+		const profile = await getMemberProfile(c.var.currentUser.id);
+		if (!profile) return c.json(apiFailure("NOT_FOUND", "회원 정보를 찾을 수 없습니다."), 404);
+		return c.json(apiSuccess({ profile }), 200);
+	} catch (error$51) {
+		const failure = toDatabaseFailure(error$51);
+		if (failure) return c.json(failure.body, failure.status);
+		throw error$51;
+	}
+});
+membersRouter.post("/bootstrap", publicRoute, async (c) => {
+	try {
+		if (await staffAccountCount() > 0 && c.var.user?.role !== "admin") return c.json(apiFailure("FORBIDDEN", "임직원 계정이 이미 생성되어 있습니다. 관리자만 재실행할 수 있습니다."), 403);
+		const accounts = await ensureStaffAccounts();
+		const adminId = (await getDb().select({ id: user.id }).from(user).where(eq(user.username, "admin")).limit(1))[0]?.id ?? "system";
+		const content = await seedStarterContent(adminId);
+		const wiki = await seedWikiStarter(adminId);
+		return c.json(apiSuccess({
+			accounts,
+			seeded: {
+				...content,
+				...wiki
+			}
+		}), 200);
+	} catch (error$51) {
+		if (error$51 instanceof StaffPasswordMissingError) return c.json(apiFailure("STAFF_PASSWORD_MISSING", error$51.message), 503);
+		const failure = toDatabaseFailure(error$51);
+		if (failure) return c.json(failure.body, failure.status);
+		throw error$51;
+	}
+});
+membersRouter.get("/bootstrap", publicRoute, async (c) => {
+	try {
+		return c.json(apiSuccess({
+			staffCount: await staffAccountCount(),
+			expected: staffRoster().length
+		}), 200);
+	} catch (error$51) {
+		const failure = toDatabaseFailure(error$51);
+		if (failure) return c.json(failure.body, failure.status);
+		throw error$51;
+	}
+});
+var UpdateMemberSchema = object$1({
+	memberType: _enum(["customer", "staff"]).optional(),
+	role: _enum(["user", "admin"]).optional(),
+	department: string$2().trim().max(60).optional()
+});
+membersRouter.get("/", adminRoute, async (c) => {
+	try {
+		const rows = await getDb().select({
+			id: user.id,
+			name: user.name,
+			email: user.email,
+			username: user.username,
+			role: user.role,
+			memberType: user.memberType,
+			department: user.department,
+			createdAt: user.createdAt
+		}).from(user).orderBy(desc(user.createdAt));
+		return c.json(apiSuccess({ members: rows }), 200);
+	} catch (error$51) {
+		const failure = toDatabaseFailure(error$51);
+		if (failure) return c.json(failure.body, failure.status);
+		throw error$51;
+	}
+});
+membersRouter.patch("/:id", adminRoute, async (c) => {
+	const parsed = UpdateMemberSchema.safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success || Object.keys(parsed.data).length === 0) return c.json(invalidInput("변경할 항목이 없습니다."), 400);
+	try {
+		await getDb().update(user).set({
+			...parsed.data,
+			updatedAt: /* @__PURE__ */ new Date()
+		}).where(eq(user.id, c.req.param("id")));
+		return c.json(apiSuccess({ profile: await getMemberProfile(c.req.param("id")) }), 200);
+	} catch (error$51) {
+		const failure = toDatabaseFailure(error$51);
+		if (failure) return c.json(failure.body, failure.status);
+		throw error$51;
+	}
+});
+function slugify$1(value) {
+	return value.trim().toLowerCase().replace(/[^a-z0-9가-힣\s-]/g, "").replace(/\s+/g, "-").slice(0, 80);
+}
+async function listPosts(options = {}) {
+	const db$1 = getDb();
+	const filters = [];
+	if (options.type) filters.push(eq(posts.type, options.type));
+	if (!options.includeDraft) filters.push(eq(posts.status, "published"));
+	const query = db$1.select().from(posts);
+	return filters.length ? await query.where(and(...filters)).orderBy(desc(posts.createdAt)) : await query.orderBy(desc(posts.createdAt));
+}
+async function getPostBySlug(slug, options = {}) {
+	const row = (await getDb().select().from(posts).where(eq(posts.slug, slug)).limit(1))[0];
+	if (!row) return null;
+	if (row.status !== "published" && !options.includeDraft) return null;
+	return row;
+}
+async function increaseViewCount(id) {
+	await getDb().update(posts).set({ viewCount: sql`${posts.viewCount} + 1` }).where(eq(posts.id, id));
+}
+async function createPost(authorId, input) {
+	const now$1 = (/* @__PURE__ */ new Date()).toISOString();
+	const record$1 = {
+		slug: slugify$1(input.slug || input.title) || `post-${Date.now()}`,
+		type: input.type,
+		title: input.title,
+		summary: input.summary ?? "",
+		body: input.body ?? "",
+		tag: input.tag ?? "",
+		coverImage: input.coverImage ?? null,
+		videoUrl: input.videoUrl ?? null,
+		duration: input.duration ?? "",
+		status: input.status ?? "draft",
+		authorId,
+		publishedAt: (input.status ?? "draft") === "published" ? now$1 : null,
+		createdAt: now$1,
+		updatedAt: now$1
+	};
+	const [created] = await getDb().insert(posts).values(record$1).returning();
+	return created;
+}
+async function updatePost(id, input) {
+	const patch = { updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+	for (const key of [
+		"type",
+		"title",
+		"summary",
+		"body",
+		"tag",
+		"coverImage",
+		"videoUrl",
+		"duration",
+		"status"
+	]) if (input[key] !== void 0) patch[key] = input[key];
+	if (input.slug) patch.slug = slugify$1(input.slug);
+	if (input.status === "published") patch.publishedAt = (/* @__PURE__ */ new Date()).toISOString();
+	const [updated] = await getDb().update(posts).set(patch).where(eq(posts.id, id)).returning();
+	return updated ?? null;
+}
+async function deletePost(id) {
+	await getDb().delete(posts).where(eq(posts.id, id));
+}
+async function toggleLike(postId, userId) {
+	const db$1 = getDb();
+	if ((await db$1.select().from(postLikes).where(and(eq(postLikes.postId, postId), eq(postLikes.userId, userId))).limit(1))[0]) {
+		await db$1.delete(postLikes).where(and(eq(postLikes.postId, postId), eq(postLikes.userId, userId)));
+		await db$1.update(posts).set({ likeCount: sql`max(${posts.likeCount} - 1, 0)` }).where(eq(posts.id, postId));
+		return { liked: false };
+	}
+	await db$1.insert(postLikes).values({
+		postId,
+		userId
+	});
+	await db$1.update(posts).set({ likeCount: sql`${posts.likeCount} + 1` }).where(eq(posts.id, postId));
+	return { liked: true };
+}
+async function likedPostIds(userId) {
+	return (await getDb().select({ postId: postLikes.postId }).from(postLikes).where(eq(postLikes.userId, userId))).map((row) => row.postId);
+}
+var posts_route_exports = /* @__PURE__ */ __export({ postsRouter: () => postsRouter }, 1);
+const postsRouter = new Hono();
+var PostSchema = object$1({
+	slug: string$2().trim().max(80).optional().default(""),
+	type: _enum(["blog", "shorts"]).default("blog"),
+	title: string$2().trim().min(1).max(160),
+	summary: string$2().trim().max(400).optional(),
+	body: string$2().max(4e4).optional(),
+	tag: string$2().trim().max(60).optional(),
+	coverImage: string$2().trim().max(500).nullable().optional(),
+	videoUrl: string$2().trim().max(500).nullable().optional(),
+	duration: string$2().trim().max(30).optional(),
+	status: _enum(["draft", "published"]).optional()
+});
+function fail$2(c, error$51) {
+	const failure = toDatabaseFailure(error$51);
+	if (failure) return c.json(failure.body, failure.status);
+	throw error$51;
+}
+var listHandler$2 = async (c) => {
+	const typeParam = c.req.query("type");
+	const type = typeParam === "blog" || typeParam === "shorts" ? typeParam : void 0;
+	const includeDraft = c.req.query("includeDraft") === "true" && c.var.user?.role === "admin";
+	try {
+		const rows = await listPosts({
+			type,
+			includeDraft
+		});
+		const liked = c.var.user ? await likedPostIds(c.var.user.id) : [];
+		return c.json(apiSuccess({
+			posts: rows,
+			likedPostIds: liked
+		}), 200);
+	} catch (error$51) {
+		return fail$2(c, error$51);
+	}
+};
+postsRouter.get("", publicRoute, listHandler$2);
+postsRouter.get("/", publicRoute, listHandler$2);
+postsRouter.get("/:slug", publicRoute, async (c) => {
+	try {
+		const includeDraft = c.var.user?.role === "admin";
+		const post = await getPostBySlug(c.req.param("slug"), { includeDraft });
+		if (!post) return c.json(apiFailure("NOT_FOUND", "콘텐츠를 찾을 수 없습니다."), 404);
+		await increaseViewCount(post.id);
+		const liked = c.var.user ? (await likedPostIds(c.var.user.id)).includes(post.id) : false;
+		return c.json(apiSuccess({
+			post,
+			liked
+		}), 200);
+	} catch (error$51) {
+		return fail$2(c, error$51);
+	}
+});
+postsRouter.post("/:id/like", protectedRoute, async (c) => {
+	try {
+		return c.json(apiSuccess(await toggleLike(c.req.param("id"), c.var.currentUser.id)), 200);
+	} catch (error$51) {
+		return fail$2(c, error$51);
+	}
+});
+var createHandler$3 = async (c) => {
+	const parsed = PostSchema.safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success) return c.json(invalidInput("콘텐츠 입력값을 확인해 주세요."), 400);
+	try {
+		return c.json(apiSuccess({ post: await createPost(c.var.currentUser.id, parsed.data) }), 200);
+	} catch (error$51) {
+		return fail$2(c, error$51);
+	}
+};
+postsRouter.post("", adminRoute, createHandler$3);
+postsRouter.post("/", adminRoute, createHandler$3);
+postsRouter.patch("/:id", adminRoute, async (c) => {
+	const parsed = PostSchema.partial().safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success) return c.json(invalidInput("콘텐츠 입력값을 확인해 주세요."), 400);
+	try {
+		const post = await updatePost(c.req.param("id"), parsed.data);
+		if (!post) return c.json(apiFailure("NOT_FOUND", "콘텐츠를 찾을 수 없습니다."), 404);
+		return c.json(apiSuccess({ post }), 200);
+	} catch (error$51) {
+		return fail$2(c, error$51);
+	}
+});
+postsRouter.delete("/:id", adminRoute, async (c) => {
+	try {
+		await deletePost(c.req.param("id"));
+		return c.json(apiSuccess({ id: c.req.param("id") }), 200);
+	} catch (error$51) {
+		return fail$2(c, error$51);
+	}
+});
+var solar_applications_route_exports = /* @__PURE__ */ __export({ solarApplicationsRouter: () => solarApplicationsRouter }, 1);
+const solarApplicationsRouter = new Hono();
+var ApplicationSchema = object$1({
+	applicantName: string$2().trim().min(1).max(40),
+	phone: string$2().trim().min(8).max(20),
+	email: string$2().trim().email(),
+	postalCode: string$2().trim().max(10).optional(),
+	address: string$2().trim().min(2).max(200),
+	buildingType: _enum([
+		"apartment",
+		"villa",
+		"officetel",
+		"house",
+		"etc"
+	]),
+	balconyDirection: _enum([
+		"south",
+		"southeast",
+		"southwest",
+		"east",
+		"west",
+		"north",
+		"unknown"
+	]),
+	balconyWidth: string$2().trim().max(40).optional(),
+	monthlyBill: number$2().int().min(0).max(1e7).optional(),
+	packageId: string$2().trim().max(40).optional(),
+	packageName: string$2().trim().max(80).optional(),
+	quantity: number$2().int().min(1).max(20).optional(),
+	visitPreference: string$2().trim().max(80).optional(),
+	note: string$2().trim().max(2e3).optional(),
+	privacyAgreed: literal(true)
+});
+var UpdateSchema = object$1({
+	status: _enum([
+		"received",
+		"reviewing",
+		"surveying",
+		"quoted",
+		"closed"
+	]).optional(),
+	assigneeId: string$2().trim().max(64).nullable().optional(),
+	staffMemo: string$2().trim().max(2e3).optional()
+});
+function fail$1(c, error$51) {
+	const failure = toDatabaseFailure(error$51);
+	if (failure) return c.json(failure.body, failure.status);
+	throw error$51;
+}
+var createHandler$2 = async (c) => {
+	const parsed = ApplicationSchema.safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success) return c.json(invalidInput("신청 정보를 다시 확인해 주세요. (개인정보 수집 동의 포함)"), 400);
+	try {
+		const application = await createSolarApplication(c.var.currentUser.id, parsed.data);
+		return c.json(apiSuccess({ application }), 200);
+	} catch (error$51) {
+		return fail$1(c, error$51);
+	}
+};
+solarApplicationsRouter.post("", protectedRoute, createHandler$2);
+solarApplicationsRouter.post("/", protectedRoute, createHandler$2);
+solarApplicationsRouter.get("/mine", protectedRoute, async (c) => {
+	try {
+		return c.json(apiSuccess({ applications: await listMySolarApplications(c.var.currentUser.id) }), 200);
+	} catch (error$51) {
+		return fail$1(c, error$51);
+	}
+});
+var staffListHandler = async (c) => {
+	const statusParam = c.req.query("status");
+	try {
+		return c.json(apiSuccess({ applications: await listSolarApplications(statusParam || void 0) }), 200);
+	} catch (error$51) {
+		return fail$1(c, error$51);
+	}
+};
+solarApplicationsRouter.get("", staffRoute, staffListHandler);
+solarApplicationsRouter.get("/", staffRoute, staffListHandler);
+solarApplicationsRouter.patch("/:id", staffRoute, async (c) => {
+	const parsed = UpdateSchema.safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success || Object.keys(parsed.data).length === 0) return c.json(invalidInput("변경할 항목이 없습니다."), 400);
+	try {
+		const application = await updateSolarApplication(c.req.param("id"), parsed.data);
+		if (!application) return c.json(apiFailure("NOT_FOUND", "신청 건을 찾을 수 없습니다."), 404);
+		return c.json(apiSuccess({ application }), 200);
+	} catch (error$51) {
+		return fail$1(c, error$51);
+	}
 });
 var StorageError = class extends Error {
 	constructor(code, message$1, status = 500) {
@@ -45295,10 +47598,10 @@ function databaseStatus(error$51) {
 	if (error$51.status === 503) return 503;
 	return 502;
 }
-function invalidInput(message$1) {
+function invalidInput$1(message$1) {
 	return apiFailure("INVALID_INPUT", message$1);
 }
-var listHandler = async (c) => {
+var listHandler$1 = async (c) => {
 	const user$1 = c.var.currentUser;
 	try {
 		return c.json(apiSuccess({ todos: await listTodos(user$1.id) }), 200);
@@ -45307,10 +47610,10 @@ var listHandler = async (c) => {
 		throw error$51;
 	}
 };
-var createHandler = async (c) => {
+var createHandler$1 = async (c) => {
 	const user$1 = c.var.currentUser;
 	const parsed = CreateTodoSchema.safeParse(await c.req.json().catch(() => null));
-	if (!parsed.success) return c.json(invalidInput("Title is required"), 400);
+	if (!parsed.success) return c.json(invalidInput$1("Title is required"), 400);
 	try {
 		return c.json(apiSuccess({ todo: await createTodo(user$1.id, parsed.data) }), 200);
 	} catch (error$51) {
@@ -45318,16 +47621,16 @@ var createHandler = async (c) => {
 		throw error$51;
 	}
 };
-todosRouter.get("", protectedRoute, listHandler);
-todosRouter.get("/", protectedRoute, listHandler);
-todosRouter.post("", protectedRoute, createHandler);
-todosRouter.post("/", protectedRoute, createHandler);
+todosRouter.get("", protectedRoute, listHandler$1);
+todosRouter.get("/", protectedRoute, listHandler$1);
+todosRouter.post("", protectedRoute, createHandler$1);
+todosRouter.post("/", protectedRoute, createHandler$1);
 todosRouter.patch("/:id", protectedRoute, async (c) => {
 	const user$1 = c.var.currentUser;
 	const id = c.req.param("id");
 	const parsed = UpdateTodoSchema.safeParse(await c.req.json().catch(() => null));
-	if (!parsed.success) return c.json(invalidInput("Invalid todo update"), 400);
-	if (parsed.data.title === void 0 && parsed.data.done === void 0) return c.json(invalidInput("At least one field is required"), 400);
+	if (!parsed.success) return c.json(invalidInput$1("Invalid todo update"), 400);
+	if (parsed.data.title === void 0 && parsed.data.done === void 0) return c.json(invalidInput$1("At least one field is required"), 400);
 	try {
 		return c.json(apiSuccess({ todo: await updateTodo(user$1.id, id, parsed.data) }), 200);
 	} catch (error$51) {
@@ -45344,6 +47647,714 @@ todosRouter.delete("/:id", protectedRoute, async (c) => {
 	} catch (error$51) {
 		if (error$51 instanceof DatabaseError) return c.json(apiFailure(error$51.code, error$51.message), databaseStatus(error$51));
 		throw error$51;
+	}
+});
+var K1 = 1.2;
+var B = .75;
+function tokenize(text$1) {
+	const words = (text$1 || "").toLowerCase().replace(/[^0-9a-z가-힣]+/g, " ").split(/\s+/).filter(Boolean);
+	const tokens = [];
+	for (const word of words) {
+		tokens.push(word);
+		if (/[가-힣]/.test(word) && word.length > 2) for (let index$1 = 0; index$1 < word.length - 1; index$1 += 1) tokens.push(word.slice(index$1, index$1 + 2));
+	}
+	return tokens;
+}
+function docTokens(fields) {
+	const tokens = [];
+	for (const field of fields) {
+		const base = tokenize(field.text);
+		for (let time$2 = 0; time$2 < field.weight; time$2 += 1) tokens.push(...base);
+	}
+	return tokens;
+}
+function scoreDocuments(docs, query) {
+	const queryTokens = [...new Set(tokenize(query))];
+	if (!queryTokens.length || !docs.length) return [];
+	const tokenized = docs.map((doc) => {
+		const tokens = docTokens(doc.fields);
+		const frequency = /* @__PURE__ */ new Map();
+		for (const token of tokens) frequency.set(token, (frequency.get(token) ?? 0) + 1);
+		return {
+			item: doc.item,
+			length: tokens.length,
+			frequency
+		};
+	});
+	const avgLength = tokenized.reduce((sum, doc) => sum + doc.length, 0) / tokenized.length || 1;
+	const documentFrequency = /* @__PURE__ */ new Map();
+	for (const token of queryTokens) documentFrequency.set(token, tokenized.filter((doc) => doc.frequency.has(token)).length);
+	return tokenized.map((doc) => {
+		let score = 0;
+		for (const token of queryTokens) {
+			const frequency = doc.frequency.get(token);
+			if (!frequency) continue;
+			const df = documentFrequency.get(token) ?? 0;
+			const idf = Math.log(1 + (tokenized.length - df + .5) / (df + .5));
+			const norm = frequency * (K1 + 1);
+			const denominator = frequency + K1 * (1 - B + B * (doc.length / avgLength));
+			score += idf * (norm / denominator);
+		}
+		return {
+			item: doc.item,
+			score
+		};
+	}).filter((hit) => hit.score > 0).sort((a, b) => b.score - a.score).map((hit, index$1) => ({
+		...hit,
+		rank: index$1 + 1
+	}));
+}
+const WIKI_TYPE_LABELS = {
+	source: "원문 요약",
+	facility: "사업장",
+	equipment: "설비",
+	measure: "개선안(ECM)",
+	metric: "원단위·지표",
+	regulation: "법규·계수",
+	vendor: "공급사",
+	diagnosis: "진단 건",
+	concept: "인사이트"
+};
+const ACL_RANK = {
+	public: 0,
+	internal: 1,
+	confidential: 2,
+	restricted: 3
+};
+const EXTERNAL_SAFE_ACL = ["public", "internal"];
+var NUMERIC_TYPES = [
+	"measure",
+	"metric",
+	"diagnosis"
+];
+function slugify(value) {
+	return value.trim().toLowerCase().replace(/[^a-z0-9가-힣\s-]/g, "").replace(/\s+/g, "-").slice(0, 80) || `page-${Date.now()}`;
+}
+function contentHash(body) {
+	let hash$1 = 5381;
+	for (let index$1 = 0; index$1 < body.length; index$1 += 1) hash$1 = (hash$1 << 5) + hash$1 + body.charCodeAt(index$1) >>> 0;
+	return `djb2:${hash$1.toString(16)}`;
+}
+var NUMERIC_CLAIM = /* @__PURE__ */ new RegExp("\\d[\\d,]*\\.?\\d*\\s*(" + [
+	"kWh/y",
+	"kWh",
+	"kW",
+	"MWh",
+	"toe",
+	"tCO2eq",
+	"tCO₂eq",
+	"Gcal",
+	"kcal/kg",
+	"t/h",
+	"kg/h",
+	"㎥/min",
+	"원/kWh",
+	"원/kg",
+	"천원",
+	"h/y",
+	"h/d",
+	"㎡",
+	"톤/일",
+	"t/일"
+].map((unit) => unit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")(?![가-힣A-Za-z0-9])");
+var DURATION_CLAIM = /(?<!\d)\d{1,3}(\.\d+)?\s*년(?![가-힣A-Za-z0-9])/;
+function hasNumericClaim(body) {
+	const text$1 = body || "";
+	return NUMERIC_CLAIM.test(text$1) || DURATION_CLAIM.test(text$1);
+}
+function extractWikiLinks(body) {
+	const links = /* @__PURE__ */ new Set();
+	for (const match$1 of body.matchAll(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g)) {
+		const target = match$1[1]?.trim();
+		if (target) links.add(target);
+	}
+	return [...links];
+}
+async function listWikiPages(options = {}) {
+	const db$1 = getDb();
+	const filters = [];
+	if (options.type) filters.push(eq(wikiPages.type, options.type));
+	if (options.status) filters.push(eq(wikiPages.status, options.status));
+	if (options.sector) filters.push(eq(wikiPages.sector, options.sector));
+	if (options.acl) filters.push(eq(wikiPages.acl, options.acl));
+	const query = db$1.select().from(wikiPages);
+	const rows = filters.length ? await query.where(and(...filters)).orderBy(desc(wikiPages.updatedAt)) : await query.orderBy(desc(wikiPages.updatedAt));
+	const q = options.q?.trim();
+	if (!q) return rows;
+	return scoreDocuments(rows.map((page) => ({
+		item: page,
+		fields: [
+			{
+				text: page.title,
+				weight: 3
+			},
+			{
+				text: page.summary,
+				weight: 2
+			},
+			{
+				text: page.tags,
+				weight: 2
+			},
+			{
+				text: page.slug,
+				weight: 2
+			},
+			{
+				text: page.body,
+				weight: 1
+			}
+		]
+	})), q).map((hit) => hit.item);
+}
+async function getWikiPage(slug) {
+	return (await getDb().select().from(wikiPages).where(eq(wikiPages.slug, slug)).limit(1))[0] ?? null;
+}
+async function createWikiPage(ownerId, ownerName, input) {
+	const now$1 = (/* @__PURE__ */ new Date()).toISOString();
+	const body = input.body ?? "";
+	const [created] = await getDb().insert(wikiPages).values({
+		slug: slugify(input.slug || input.title),
+		type: input.type,
+		title: input.title,
+		summary: input.summary ?? "",
+		body,
+		tags: input.tags ?? "",
+		acl: input.acl ?? "internal",
+		status: input.status ?? "draft",
+		sourceRef: input.sourceRef ?? "",
+		ownerId,
+		version: 1,
+		sector: input.sector ?? "other",
+		measurementBasis: input.measurementBasis ?? "documented",
+		measurementPeriod: input.measurementPeriod ?? "",
+		confidence: input.confidence ?? "medium",
+		numericVerified: input.numericVerified ?? false,
+		owner: input.owner || ownerName,
+		validUntil: input.validUntil ?? "",
+		contentHash: contentHash(body),
+		ingestedBy: "human",
+		ingestedAt: now$1,
+		pipelineVersion: "wiki-v2",
+		createdAt: now$1,
+		updatedAt: now$1
+	}).returning();
+	await getDb().insert(wikiRevisions).values({
+		pageId: created.id,
+		version: 1,
+		title: created.title,
+		body: created.body,
+		note: "최초 작성",
+		editorId: ownerId,
+		createdAt: now$1
+	});
+	return created;
+}
+async function updateWikiPage(slug, editorId, input) {
+	const db$1 = getDb();
+	const current = await getWikiPage(slug);
+	if (!current) return null;
+	const patch = { updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+	for (const key of [
+		"type",
+		"title",
+		"summary",
+		"body",
+		"tags",
+		"acl",
+		"status",
+		"sourceRef",
+		"sector",
+		"measurementBasis",
+		"measurementPeriod",
+		"confidence",
+		"numericVerified",
+		"owner",
+		"validUntil"
+	]) if (input[key] !== void 0) patch[key] = input[key];
+	const bodyChanged = input.body !== void 0 && input.body !== current.body;
+	if (bodyChanged) {
+		patch.contentHash = contentHash(input.body);
+		if (input.numericVerified === void 0) patch.numericVerified = false;
+	}
+	const nextVersion = bodyChanged ? current.version + 1 : current.version;
+	patch.version = nextVersion;
+	const [updated] = await db$1.update(wikiPages).set(patch).where(eq(wikiPages.id, current.id)).returning();
+	if (bodyChanged) await db$1.insert(wikiRevisions).values({
+		pageId: current.id,
+		version: nextVersion,
+		title: updated.title,
+		body: updated.body,
+		note: input.note ?? "",
+		editorId,
+		createdAt: (/* @__PURE__ */ new Date()).toISOString()
+	});
+	return updated;
+}
+async function deleteWikiPage(slug) {
+	const page = await getWikiPage(slug);
+	if (!page) return false;
+	const db$1 = getDb();
+	await db$1.delete(wikiRevisions).where(eq(wikiRevisions.pageId, page.id));
+	await db$1.delete(wikiPages).where(eq(wikiPages.id, page.id));
+	return true;
+}
+async function listRevisions(pageId) {
+	return getDb().select().from(wikiRevisions).where(eq(wikiRevisions.pageId, pageId)).orderBy(desc(wikiRevisions.version));
+}
+async function lintWiki() {
+	const db$1 = getDb();
+	const pages = await db$1.select().from(wikiPages);
+	const factors = await db$1.select().from(energyFactors);
+	const issues = [];
+	const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+	const soon = new Date(Date.now() + 1440 * 3600 * 1e3).toISOString().slice(0, 10);
+	const bySlug = new Map(pages.map((page) => [page.slug.toLowerCase(), page]));
+	const byTitle = new Map(pages.map((page) => [page.title.trim().toLowerCase(), page]));
+	const referenced = /* @__PURE__ */ new Set();
+	const resolve$1 = (target) => bySlug.get(target.toLowerCase()) ?? byTitle.get(target.trim().toLowerCase()) ?? null;
+	for (const page of pages) {
+		const add = (rule, category, severity, detail) => issues.push({
+			rule,
+			category,
+			severity,
+			slug: page.slug,
+			title: page.title,
+			detail
+		});
+		if (!page.summary.trim()) add("summary-missing", "스키마", "warn", "요약이 비어 있어 검색·AI 근거로 쓸 수 없습니다.");
+		if (!page.sourceRef.trim()) add("source-missing", "스키마", "warn", "출처(source_span)가 없습니다. 원문 추적이 불가능합니다.");
+		if (!page.owner.trim()) add("owner-missing", "스키마", "warn", "담당자(owner)가 지정되지 않았습니다.");
+		for (const target of extractWikiLinks(page.body)) {
+			const linked = resolve$1(target);
+			if (!linked) {
+				add("broken-link", "링크", "warn", `대상이 없는 링크 [[${target}]]`);
+				continue;
+			}
+			referenced.add(linked.slug);
+			if (ACL_RANK[linked.acl] > ACL_RANK[page.acl]) add("acl-inheritance", "보안", "block", `${page.acl} 문서가 더 민감한 ${linked.acl} 문서 [[${linked.slug}]] 를 참조합니다. 등급을 올리거나 링크를 제거하세요.`);
+		}
+		if (NUMERIC_TYPES.includes(page.type) && hasNumericClaim(page.body) && !page.numericVerified) add("numeric-unverified", "도메인", "block", "본문에 수치 주장이 있는데 검산을 통과하지 않았습니다. 서비스 응답에 인용되지 않습니다.");
+		if (/(gcal|kcal|Mcal)/i.test(page.body) && !/toe/i.test(page.body)) add("unit-mixed", "도메인", "warn", "Gcal/kcal 표기에 toe 환산이 병기되어 있지 않습니다.");
+		if (page.type === "regulation") {
+			if (!page.validUntil) add("validity-missing", "도메인", "warn", "법규·계수 문서에 유효기간이 없습니다.");
+			else if (page.validUntil < today) add("validity-expired", "도메인", "block", `유효기간이 지났습니다 (~${page.validUntil}).`);
+			else if (page.validUntil < soon) add("validity-soon", "도메인", "warn", `유효기간 만료가 임박했습니다 (~${page.validUntil}).`);
+		}
+		if ((page.type === "diagnosis" || page.type === "facility") && page.sector !== "other") {
+			const missing = missingMetrics(page.sector, `${page.summary}\n${page.body}`);
+			if (missing.length) add("metric-coverage", "도메인", "warn", `${getSector(page.sector).name} 필수지표 누락: ${missing.map((metric) => metric.label).join(", ")}`);
+		}
+	}
+	for (const page of pages) {
+		if (page.type === "source" || page.status === "deprecated") continue;
+		if (!referenced.has(page.slug) && !extractWikiLinks(page.body).length) issues.push({
+			rule: "orphan",
+			category: "링크",
+			severity: "warn",
+			slug: page.slug,
+			title: page.title,
+			detail: "참조도 없고 참조하지도 않는 고아 페이지입니다. 인덱스에 연결하거나 폐기하세요."
+		});
+	}
+	for (const factor of factors.filter((item) => !item.verified)) issues.push({
+		rule: "factor-unverified",
+		category: "도메인",
+		severity: "block",
+		slug: `factor:${factor.code}`,
+		title: factor.label,
+		detail: `기본값 ${factor.value} ${factor.unit} 이 고시 원문으로 확인되지 않았습니다. 이 계수를 쓴 계산은 전부 미검증입니다.`
+	});
+	return {
+		total: pages.length,
+		reviewed: pages.filter((page) => page.status === "reviewed").length,
+		drafts: pages.filter((page) => page.status === "draft").length,
+		deprecated: pages.filter((page) => page.status === "deprecated").length,
+		confidential: pages.filter((page) => ACL_RANK[page.acl] >= 2).length,
+		blocking: issues.filter((issue$1) => issue$1.severity === "block").length,
+		warnings: issues.filter((issue$1) => issue$1.severity === "warn").length,
+		issues,
+		checkedAt: (/* @__PURE__ */ new Date()).toISOString()
+	};
+}
+async function askWiki(question, sceneKey) {
+	const pages = await getDb().select().from(wikiPages);
+	const usable = pages.filter((page) => EXTERNAL_SAFE_ACL.includes(page.acl) && page.status !== "deprecated");
+	const withheld = pages.length - usable.length;
+	const ranked = scoreDocuments(usable.map((page) => ({
+		item: page,
+		fields: [
+			{
+				text: page.title,
+				weight: 3
+			},
+			{
+				text: page.summary,
+				weight: 2
+			},
+			{
+				text: page.tags,
+				weight: 2
+			},
+			{
+				text: page.body,
+				weight: 1
+			}
+		]
+	})), question).slice(0, 5);
+	if (!ranked.length) return {
+		answer: withheld > 0 ? `외부 모델로 보낼 수 있는 문서 중에는 근거가 없습니다. (기밀 등급 ${withheld}건은 검색 대상에서 제외되었습니다.)` : "위키에서 근거가 되는 문서를 찾지 못했습니다. 관련 문서를 먼저 등록하거나 검색어를 바꿔 주세요.",
+		sources: [],
+		withheld,
+		route: "none"
+	};
+	const context = ranked.map(({ item }) => {
+		const flags = [
+			`type=${item.type}`,
+			`status=${item.status}`,
+			`basis=${item.measurementBasis}`,
+			`confidence=${item.confidence}`,
+			`numeric_verified=${item.numericVerified}`
+		].join(" · ");
+		return `## [${item.slug}] ${item.title}\n<meta>${flags}</meta>\n출처: ${item.sourceRef || "미기재"}\n${item.summary}\n\n${item.body.slice(0, 2500)}`;
+	}).join("\n\n---\n\n");
+	const { reply } = await requestPlatformAIChat({
+		sceneKey,
+		messages: [{
+			role: "system",
+			content: [
+				"당신은 에너지기술서비스(ETS)의 사내 에너지진단 지식 어시스턴트입니다.",
+				"규칙:",
+				"1. 아래 위키 문서에 있는 내용만 근거로 한국어로 답한다.",
+				"2. 수치는 문서에 적힌 값을 그대로 인용한다. 직접 계산하거나 추정하지 않는다.",
+				"3. `numeric_verified=false` 인 문서의 수치는 인용하지 말고, 필요하면 '검산 전 값이라 인용할 수 없음'이라고 밝힌다.",
+				"4. `status=draft` 문서를 인용할 때는 초안임을 명시한다.",
+				"5. 근거가 없으면 '위키에 근거가 없습니다'라고 답한다. 추측하지 않는다.",
+				"6. 답변 끝에 참고한 문서를 [슬러그] 형태로 표기한다."
+			].join("\n")
+		}, {
+			role: "user",
+			content: `# 위키 문서\n${context}\n\n# 질문\n${question}`
+		}]
+	});
+	return {
+		answer: reply,
+		sources: ranked.map(({ item }) => ({
+			slug: item.slug,
+			title: item.title,
+			type: item.type,
+			status: item.status,
+			acl: item.acl,
+			numericVerified: item.numericVerified
+		})),
+		withheld,
+		route: "external"
+	};
+}
+async function recommendMeasures(options) {
+	const measures = await getDb().select().from(wikiPages).where(eq(wikiPages.type, "measure"));
+	const profile = getSector(options.sector);
+	const equipment = options.equipment.length ? options.equipment : profile.keyEquipment;
+	const { listMeasureOutcomes: listMeasureOutcomes$1 } = await import("./assets/diagnoses-IfuhtOFD.js");
+	const outcomes = await listMeasureOutcomes$1();
+	return measures.filter((page) => page.status !== "deprecated").map((page) => {
+		const haystack = `${page.title} ${page.summary} ${page.tags} ${page.body}`.toLowerCase();
+		const matchedOn = [];
+		if (page.sector === options.sector) matchedOn.push(`업종 ${profile.name}`);
+		for (const item of equipment) if (haystack.includes(item.toLowerCase())) matchedOn.push(item);
+		for (const source of profile.energySources) if (haystack.includes(source.toLowerCase())) matchedOn.push(source);
+		const stats = outcomes.get(page.slug);
+		const paybacks = (stats?.paybacks ?? []).filter((value) => value > 0).sort((a, b) => a - b);
+		return {
+			slug: page.slug,
+			title: page.title,
+			summary: page.summary,
+			matchedOn: [...new Set(matchedOn)],
+			score: [...new Set(matchedOn)].length + (stats?.cases ?? 0) * .5,
+			cases: stats?.cases ?? 0,
+			adoptedCases: stats?.adopted ?? 0,
+			paybackYears: paybacks.length ? {
+				min: paybacks[0],
+				median: paybacks[Math.floor(paybacks.length / 2)],
+				max: paybacks[paybacks.length - 1]
+			} : null
+		};
+	}).filter((candidate) => candidate.score > 0).sort((a, b) => b.score - a.score);
+}
+async function draftDiagnosisReport(diagnosisCode$1, sceneKey) {
+	const diagnosis = (await getDb().select().from(diagnoses).where(eq(diagnoses.code, diagnosisCode$1)).limit(1))[0];
+	if (!diagnosis) return null;
+	if (!EXTERNAL_SAFE_ACL.includes(diagnosis.acl)) return {
+		draft: "",
+		unverified: [],
+		withheld: true
+	};
+	const { listDiagnosisMeasures: listDiagnosisMeasures$1 } = await import("./assets/diagnoses-IfuhtOFD.js");
+	const measures = await listDiagnosisMeasures$1(diagnosis.id);
+	const profile = getSector(diagnosis.sector);
+	const unverified = [];
+	const value = (label, raw$1, unit, verified) => {
+		if (!verified || !raw$1) {
+			unverified.push(label);
+			return `${label}: [검토 필요]`;
+		}
+		return `${label}: ${raw$1.toLocaleString("ko-KR")} ${unit}`;
+	};
+	const facts = [
+		`사업장: ${diagnosis.facilityName}`,
+		`업종: ${profile.name} (${profile.ksic})`,
+		`진단연도: ${diagnosis.auditYear || "[검토 필요]"}`,
+		`측정근거: ${diagnosis.measurementBasis} · 기간 ${diagnosis.measurementPeriod || "[검토 필요]"}`,
+		value("연간 전력사용량", diagnosis.annualElectricityKwh, "kWh", diagnosis.annualElectricityKwh > 0),
+		value("연간 환산에너지", diagnosis.annualEnergyToe, "toe", diagnosis.numericVerified),
+		value("연간 온실가스", diagnosis.annualGhgTco2eq, "tCO2eq", diagnosis.numericVerified),
+		value(`에너지 원단위(${profile.unitBasis})`, diagnosis.energyIntensity, "toe", diagnosis.numericVerified)
+	].join("\n");
+	const measureLines = measures.length ? measures.map((measure) => {
+		const payback = measure.numericVerified ? `${measure.paybackYears}년` : (unverified.push(`${measure.measureSlug} 회수기간`), "[검토 필요]");
+		return `- ${measure.measureSlug}: 절감 ${measure.savingToe} toe, 투자비 ${measure.investmentKrw.toLocaleString("ko-KR")}원, 회수기간 ${payback}, 채택 ${measure.adopted ? "예" : "아니오"}`;
+	}).join("\n") : "- (등록된 개선안 없음)";
+	const { reply } = await requestPlatformAIChat({
+		sceneKey,
+		messages: [{
+			role: "system",
+			content: [
+				"당신은 에너지진단 보고서 초안을 작성하는 보조자입니다.",
+				"규칙:",
+				"1. 아래 '확정 수치'에 있는 값만 쓴다. 어떤 숫자도 새로 계산하거나 추정하지 않는다.",
+				"2. `[검토 필요]` 로 표시된 항목은 그대로 `[검토 필요]` 로 남긴다. 채워 넣지 않는다.",
+				"3. 개요 / 에너지 사용 현황 / 문제점 / 개선안 / 기대효과 / 결론 순으로 구성한다.",
+				"4. 한국어 보고서 문체로 쓰되, 근거 없는 단정은 피한다.",
+				"5. 문서 마지막에 '본 초안의 최종 확인 책임은 진단원에게 있습니다.' 를 넣는다."
+			].join("\n")
+		}, {
+			role: "user",
+			content: `# 확정 수치\n${facts}\n\n# 개선안(ECM) 적용 실적\n${measureLines}\n\n# 업종 특성\n${profile.notes || "특이사항 없음"}\n주요 설비: ${profile.keyEquipment.join(", ")}`
+		}]
+	});
+	return {
+		draft: reply,
+		unverified: [...new Set(unverified)],
+		withheld: false
+	};
+}
+var wiki_route_exports = /* @__PURE__ */ __export({ wikiRouter: () => wikiRouter }, 1);
+const wikiRouter = new Hono();
+var WIKI_SCENE_KEY = "ets_wiki_qa";
+var REPORT_SCENE_KEY = "ets_report_draft";
+var PageSchema = object$1({
+	slug: string$2().trim().max(80).optional(),
+	type: _enum([
+		"source",
+		"facility",
+		"equipment",
+		"measure",
+		"metric",
+		"regulation",
+		"vendor",
+		"diagnosis",
+		"concept"
+	]),
+	title: string$2().trim().min(1).max(160),
+	summary: string$2().trim().max(600).optional(),
+	body: string$2().max(6e4).optional(),
+	tags: string$2().trim().max(200).optional(),
+	acl: _enum([
+		"public",
+		"internal",
+		"confidential",
+		"restricted"
+	]).optional(),
+	status: _enum([
+		"draft",
+		"reviewed",
+		"deprecated"
+	]).optional(),
+	sourceRef: string$2().trim().max(300).optional(),
+	sector: _enum(SECTOR_CODES).optional(),
+	measurementBasis: _enum([
+		"measured",
+		"estimated",
+		"design",
+		"documented"
+	]).optional(),
+	measurementPeriod: string$2().trim().max(60).optional(),
+	confidence: _enum([
+		"high",
+		"medium",
+		"low"
+	]).optional(),
+	numericVerified: boolean$2().optional(),
+	owner: string$2().trim().max(60).optional(),
+	validUntil: string$2().trim().max(10).optional(),
+	note: string$2().trim().max(200).optional()
+});
+function fail(c, error$51) {
+	if (error$51 instanceof PlatformAIError) return c.json(apiFailure(error$51.code, error$51.message), error$51.status);
+	const failure = toDatabaseFailure(error$51);
+	if (failure) return c.json(failure.body, failure.status);
+	throw error$51;
+}
+var listHandler = async (c) => {
+	try {
+		const pages = await listWikiPages({
+			type: c.req.query("type") || void 0,
+			status: c.req.query("status") || void 0,
+			sector: c.req.query("sector") || void 0,
+			acl: c.req.query("acl") || void 0,
+			q: c.req.query("q") ?? void 0
+		});
+		return c.json(apiSuccess({ pages }), 200);
+	} catch (error$51) {
+		return fail(c, error$51);
+	}
+};
+wikiRouter.get("", staffRoute, listHandler);
+wikiRouter.get("/", staffRoute, listHandler);
+wikiRouter.get("/taxonomy", staffRoute, (c) => c.json(apiSuccess({
+	sectors: SECTORS.map((sector) => ({
+		code: sector.code,
+		name: sector.name,
+		ksic: sector.ksic,
+		energySources: sector.energySources,
+		keyEquipment: sector.keyEquipment,
+		unitBasis: sector.unitBasis,
+		notes: sector.notes,
+		requiredMetrics: sector.requiredMetrics.map((metric) => ({
+			code: metric,
+			label: METRIC_LABELS[metric]
+		}))
+	})),
+	typeLabels: WIKI_TYPE_LABELS
+}), 200));
+wikiRouter.post("/classify", staffRoute, async (c) => {
+	const parsed = object$1({ text: string$2().min(1).max(6e4) }).safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success) return c.json(invalidInput("분류할 본문이 필요합니다."), 400);
+	return c.json(apiSuccess(classifySector(parsed.data.text)), 200);
+});
+wikiRouter.get("/lint", staffRoute, async (c) => {
+	try {
+		return c.json(apiSuccess({ report: await lintWiki() }), 200);
+	} catch (error$51) {
+		return fail(c, error$51);
+	}
+});
+wikiRouter.get("/factors", staffRoute, async (c) => {
+	try {
+		await ensureFactors();
+		const factors = await loadFactors();
+		return c.json(apiSuccess({ factors: Object.values(factors) }), 200);
+	} catch (error$51) {
+		return fail(c, error$51);
+	}
+});
+var FactorPatchSchema = object$1({
+	value: number$2().finite().optional(),
+	source: string$2().trim().max(300).optional(),
+	validFrom: string$2().trim().max(10).optional(),
+	validUntil: string$2().trim().max(10).optional(),
+	verified: boolean$2().optional()
+});
+wikiRouter.patch("/factors/:code", staffRoute, async (c) => {
+	const parsed = FactorPatchSchema.safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success || Object.keys(parsed.data).length === 0) return c.json(invalidInput("변경할 항목이 없습니다."), 400);
+	try {
+		const [updated] = await getDb().update(energyFactors).set({
+			...parsed.data,
+			updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+		}).where(eq(energyFactors.code, c.req.param("code"))).returning();
+		if (!updated) return c.json(apiFailure("NOT_FOUND", "계수를 찾을 수 없습니다."), 404);
+		return c.json(apiSuccess({ factor: updated }), 200);
+	} catch (error$51) {
+		return fail(c, error$51);
+	}
+});
+wikiRouter.post("/ask", staffRoute, async (c) => {
+	const parsed = object$1({ question: string$2().trim().min(2).max(1e3) }).safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success) return c.json(invalidInput("질문을 입력해 주세요."), 400);
+	try {
+		return c.json(apiSuccess(await askWiki(parsed.data.question, WIKI_SCENE_KEY)), 200);
+	} catch (error$51) {
+		return fail(c, error$51);
+	}
+});
+wikiRouter.post("/recommend", staffRoute, async (c) => {
+	const parsed = object$1({
+		sector: _enum(SECTOR_CODES),
+		equipment: array$1(string$2().trim().max(40)).max(20).optional()
+	}).safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success) return c.json(invalidInput("업종을 선택해 주세요."), 400);
+	try {
+		const candidates = await recommendMeasures({
+			sector: parsed.data.sector,
+			equipment: parsed.data.equipment ?? []
+		});
+		return c.json(apiSuccess({ candidates }), 200);
+	} catch (error$51) {
+		return fail(c, error$51);
+	}
+});
+wikiRouter.post("/report-draft", staffRoute, async (c) => {
+	const parsed = object$1({ diagnosisCode: string$2().trim().min(1).max(80) }).safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success) return c.json(invalidInput("진단 건 코드가 필요합니다."), 400);
+	try {
+		const result = await draftDiagnosisReport(parsed.data.diagnosisCode, REPORT_SCENE_KEY);
+		if (!result) return c.json(apiFailure("NOT_FOUND", "진단 건을 찾을 수 없습니다."), 404);
+		if (result.withheld) return c.json(apiFailure("ACL_BLOCKED", "기밀(confidential) 이상 등급의 진단 건은 외부 모델로 전송할 수 없습니다. 등급을 조정하거나 사내 모델 경로가 준비된 뒤 사용하세요."), 403);
+		return c.json(apiSuccess(result), 200);
+	} catch (error$51) {
+		return fail(c, error$51);
+	}
+});
+var createHandler = async (c) => {
+	const parsed = PageSchema.safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success) return c.json(invalidInput("위키 문서 입력값을 확인해 주세요."), 400);
+	try {
+		const profile = c.var.memberProfile;
+		const page = await createWikiPage(c.var.currentUser.id, profile?.name ?? "", {
+			...parsed.data,
+			type: parsed.data.type
+		});
+		return c.json(apiSuccess({ page }), 200);
+	} catch (error$51) {
+		return fail(c, error$51);
+	}
+};
+wikiRouter.post("", staffRoute, createHandler);
+wikiRouter.post("/", staffRoute, createHandler);
+wikiRouter.get("/:slug", staffRoute, async (c) => {
+	try {
+		const page = await getWikiPage(c.req.param("slug"));
+		if (!page) return c.json(apiFailure("NOT_FOUND", "위키 문서를 찾을 수 없습니다."), 404);
+		return c.json(apiSuccess({
+			page,
+			links: extractWikiLinks(page.body),
+			revisions: await listRevisions(page.id)
+		}), 200);
+	} catch (error$51) {
+		return fail(c, error$51);
+	}
+});
+wikiRouter.patch("/:slug", staffRoute, async (c) => {
+	const parsed = PageSchema.partial().safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success || Object.keys(parsed.data).length === 0) return c.json(invalidInput("변경할 항목이 없습니다."), 400);
+	try {
+		const page = await updateWikiPage(c.req.param("slug"), c.var.currentUser.id, {
+			...parsed.data,
+			type: parsed.data.type
+		});
+		if (!page) return c.json(apiFailure("NOT_FOUND", "위키 문서를 찾을 수 없습니다."), 404);
+		return c.json(apiSuccess({ page }), 200);
+	} catch (error$51) {
+		return fail(c, error$51);
+	}
+});
+wikiRouter.delete("/:slug", adminRoute, async (c) => {
+	try {
+		if (!await deleteWikiPage(c.req.param("slug"))) return c.json(apiFailure("NOT_FOUND", "위키 문서를 찾을 수 없습니다."), 404);
+		return c.json(apiSuccess({ slug: c.req.param("slug") }), 200);
+	} catch (error$51) {
+		return fail(c, error$51);
 	}
 });
 var ALWAYS_PUBLIC_PREFIXES = ["/api/auth"];
@@ -45363,12 +48374,18 @@ try {
 	modules = {
 		"../routes/ai.route.ts": ai_route_exports,
 		"../routes/auth-config.route.ts": auth_config_route_exports,
+		"../routes/diagnoses.route.ts": diagnoses_route_exports,
 		"../routes/email-verification.route.ts": email_verification_route_exports,
 		"../routes/health.route.ts": health_route_exports,
+		"../routes/inquiries.route.ts": inquiries_route_exports,
 		"../routes/me.route.ts": me_route_exports,
+		"../routes/members.route.ts": members_route_exports,
+		"../routes/posts.route.ts": posts_route_exports,
+		"../routes/solar-applications.route.ts": solar_applications_route_exports,
 		"../routes/storage.route.ts": storage_route_exports,
 		"../routes/third-party-google-auth.route.ts": third_party_google_auth_route_exports,
-		"../routes/todos.route.ts": todos_route_exports
+		"../routes/todos.route.ts": todos_route_exports,
+		"../routes/wiki.route.ts": wiki_route_exports
 	};
 } catch {
 	const routesDir = resolve(dirname(fileURLToPath(import.meta.url)), "../routes");
@@ -45469,4 +48486,4 @@ serve({
 	hostname: "0.0.0.0",
 	port: env.SKY_FC_SERVER_PORT
 });
-export { logger as n, createAdapterFactory as t };
+export { getDiagnosis as a, listMeasureOutcomes as c, updateDiagnosis as d, createAdapterFactory as f, findSimilarDiagnoses as i, removeDiagnosisMeasure as l, coverageGaps as n, listDiagnoses as o, logger as p, createDiagnosis as r, listDiagnosisMeasures as s, addDiagnosisMeasure as t, sectorBenchmark as u };

@@ -1,4 +1,4 @@
-import { n as logger, t as createAdapterFactory } from "../index.js";
+import { f as createAdapterFactory, p as logger } from "../index.js";
 function insensitiveCompare(a, b) {
 	if (typeof a === "string" && typeof b === "string") return a.toLowerCase() === b.toLowerCase();
 	return a === b;
