@@ -37,15 +37,15 @@ const services = [
   {
     title: "에너지 진단",
     label: "AUDIT",
-    description: "설비와 운영 데이터를 기반으로 손실 요인을 찾고 실행 가능한 절감안을 설계합니다.",
+    description: "에너지 다소비 건물·공장의 설비와 운영 데이터를 정밀 분석해 손실 요인과 절감 잠재량을 찾아냅니다.",
     icon: Gauge,
-    image: IMAGES.BUSINESS_DOT_ESCO,
+    image: IMAGES.BUSINESS_DOT_AUDIT,
     legacy: "energy-audit.html",
   },
   {
     title: "ESCO 사업",
     label: "PERFORMANCE",
-    description: "절감 효과와 투자 구조를 함께 고려해 시설 개선의 실행력을 높입니다.",
+    description: "진단에서 확인한 절감 기회에 고효율 설비를 적용해, 에너지 절감을 투자 회수와 경제적 가치로 실현합니다.",
     icon: Zap,
     image: IMAGES.BUSINESS_DOT_ESCO,
     legacy: "esco.html",
