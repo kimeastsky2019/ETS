@@ -812,7 +812,69 @@ export interface EnginesResponse {
   cached: boolean;
 }
 
+// --- 진단 준비 체크리스트 (/api/audit) --------------------------------------- #
+
+export interface ChecklistItem {
+  id: string;
+  name: string;
+  source: string;      // 근거가 된 위키 measure 의 stable_id
+  checked: string;
+  note: string;
+}
+
+export interface ChecklistGroup {
+  equipment: string;
+  fields: string[];
+  items: ChecklistItem[];
+}
+
+export interface ChecklistDraft {
+  sector: string;
+  sector_name: string;
+  unit_basis: string;
+  energy_sources: string[];
+  groups: ChecklistGroup[];
+  item_count: number;
+  from_wiki: boolean;
+  wiki_measures: number;
+}
+
+export interface ChecklistSummary {
+  id: string;
+  title: string;
+  sector: string;
+  subsector: string;
+  site: string;
+  owner: string;
+  item_count: number;
+  updated_at: string;
+}
+
+export interface ChecklistRecord extends ChecklistDraft {
+  id: string;
+  title: string;
+  subsector: string;
+  site: string;
+  homepage: string;
+  owner: string;
+  note: string;
+  updated_at: string;
+}
+
 // --- 에너지 진단 위키 (/api/wiki) ------------------------------------------- #
+
+/** rag.ets0404.com 에 적재되어 있고 원본이 보관된 문서 */
+export interface RagDocument {
+  id: number;
+  name: string;
+  collection_name: string | null;
+  stable_id: string | null;
+  sha256: string | null;
+  size_bytes: number | null;
+  chunk_count: number;
+  acl: string;
+  created_at: string;
+}
 export type WikiAcl = "public" | "internal" | "confidential" | "restricted";
 export type WikiStatus = "draft" | "reviewed" | "deprecated";
 
@@ -1078,85 +1140,8 @@ function post<T>(url: string, payload?: unknown): Promise<T> {
   });
 }
 
-
-/* ── 진단 준비 (체크리스트 · 시계열) ─────────────────────────────────── */
-
-export interface ChecklistItem {
-  id: string;
-  name: string;
-  source: string;
-  checked: string;
-  note: string;
-}
-
-export interface ChecklistGroup {
-  equipment: string;
-  fields: string[];
-  items: ChecklistItem[];
-}
-
-export interface ChecklistDraft {
-  sector: string;
-  sector_name: string;
-  unit_basis: string;
-  energy_sources: string[];
-  groups: ChecklistGroup[];
-  item_count: number;
-  from_wiki: boolean;
-  wiki_measures: number;
-}
-
-export interface Checklist {
-  id: string;
-  title: string;
-  sector: string;
-  subsector: string;
-  site: string;
-  homepage: string;
-  owner: string;
-  note: string;
-  groups: ChecklistGroup[];
-  updated_at: string;
-}
-
-export interface ChecklistSummary {
-  id: string;
-  title: string;
-  sector: string;
-  subsector: string;
-  site: string;
-  owner: string;
-  item_count: number;
-  updated_at: string;
-}
-
-export interface TimeseriesRow {
-  stable_id: string;
-  title: string;
-  type: string;
-  sector: string;
-  sector_name: string;
-  domain: string;
-  year: string;
-  status: string;
-  numeric_verified: boolean;
-  tags: string[];
-}
-
-export interface TimeseriesYear {
-  year: string;
-  pages: number;
-  verified: number;
-  by_type: Record<string, number>;
-}
-
-export interface Timeseries {
-  rows: TimeseriesRow[];
-  years: string[];
-  by_year: TimeseriesYear[];
-  undated: number;
-  ledger_by_year: { year: string; documents: number }[];
-  sectors: KbSector[];
+function del<T>(url: string): Promise<T> {
+  return request<T>(url, { method: "DELETE" });
 }
 
 export const api = {
@@ -1313,6 +1298,18 @@ export const api = {
   // --- 에너지 진단 위키 ---
   // preview 는 저장하지 않는다. 사업장 키가 바뀌면 모든 stable_id 가 바뀌므로,
   // 사람이 눈으로 확인하는 단계를 화면에서도 강제한다.
+  audit: {
+    checklistDraft: (sector: string, lang = "ko") =>
+      get<ChecklistDraft>(`/api/audit/checklist/draft?sector=${encodeURIComponent(sector)}&lang=${lang}`),
+    checklists: () => get<{ checklists: ChecklistSummary[] }>("/api/audit/checklists"),
+    checklist: (cid: string) =>
+      get<ChecklistRecord>(`/api/audit/checklists/${encodeURIComponent(cid)}`),
+    saveChecklist: (payload: Record<string, unknown>) =>
+      post<ChecklistRecord>("/api/audit/checklists", payload),
+    deleteChecklist: (cid: string) =>
+      del<{ deleted: string }>(`/api/audit/checklists/${encodeURIComponent(cid)}`),
+  },
+
   wiki: {
     health: () => get<WikiHealth>("/api/wiki/health"),
     schema: () => get<Record<string, unknown>>("/api/wiki/schema"),
@@ -1324,6 +1321,23 @@ export const api = {
     /** PDF → 위키 저장. 적재 게이트를 통과하지 못하면 아무것도 쓰지 않는다. */
     ingest: (file: File, site: string, sector?: string, owner?: string) =>
       upload<WikiBuildResult>("/api/wiki/ingest", file, { site, sector, owner }),
+
+    /** RAG(rag.ets0404.com)에 이미 적재된 문서 목록. 원본이 보관된 것만 온다. */
+    ragDocuments: () =>
+      get<{ enabled: boolean; documents: RagDocument[]; count: number; reason?: string }>(
+        "/api/wiki/rag/documents"
+      ),
+    /** RAG 문서로 초안만 만든다. 저장하지 않는다. */
+    ragPreview: (documentId: number, site: string, sector?: string, owner?: string) => {
+      const q = new URLSearchParams({ site, owner: owner ?? "" });
+      if (sector) q.set("sector", sector);
+      return get<WikiBuildResult>(`/api/wiki/rag/documents/${documentId}/preview?${q}`);
+    },
+    /** RAG 문서를 위키에 저장한다. 서명(owner)이 없으면 서버가 400 으로 막는다. */
+    ragIngest: (documentId: number, site: string, sector: string | undefined, owner: string) =>
+      post<WikiBuildResult>("/api/wiki/rag/ingest", {
+        document_id: documentId, site, sector, owner,
+      }),
     pages: (acl: WikiAcl, type?: string, status?: string) =>
       get<{ pages: WikiPageSummary[]; stats: WikiStats; types: WikiTypeInfo[] }>(
         `/api/wiki/pages?acl=${acl}` +
@@ -1386,23 +1400,6 @@ export const api = {
       ),
     log: () => get<{ log: WikiLogRow[] }>("/api/wiki/log"),
     catalogUrl: () => tag("/api/wiki/index.md"),
-  },
-
-  /** 진단 준비. 위키를 읽어 만들 뿐 위키를 바꾸지 않는다. */
-  audit: {
-    draft: (sector: string) =>
-      get<ChecklistDraft>(`/api/audit/checklist/draft?sector=${encodeURIComponent(sector)}`),
-    list: () => get<{ checklists: ChecklistSummary[] }>("/api/audit/checklists"),
-    get: (id: string) => get<Checklist>(`/api/audit/checklists/${encodeURIComponent(id)}`),
-    save: (payload: Partial<Checklist>) => post<Checklist>("/api/audit/checklists", payload),
-    remove: (id: string) =>
-      request<{ deleted: string }>(`/api/audit/checklists/${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      }),
-    timeseries: (sector: string, type: string) =>
-      get<Timeseries>(
-        `/api/audit/timeseries?sector=${encodeURIComponent(sector)}&type=${encodeURIComponent(type)}`
-      ),
   },
 };
 

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  api,
+import { api,
   setApiLang,
   setApiProject,
   waitForJob,
@@ -13,8 +12,7 @@ import {
   type ProjectInfo,
   type SearchHit,
   type TableDetail,
-  type TreeLayer,
-} from "./api";
+  type TreeLayer, type WikiHealth } from "./api";
 import { FolderPicker, ProjectBar } from "./Projects";
 import {
   LANGS,
@@ -32,12 +30,14 @@ import Compliance, { REG_TABS, type RegTab } from "./Compliance";
 import KnowledgeBase, { KB_TABS, type KbTab } from "./KnowledgeBase";
 import Wiki, { WIKI_TABS, type WikiTab } from "./Wiki";
 import WikiAdmin, { ADMIN_TABS, type AdminTab } from "./WikiAdmin";
-import ChecklistView from "./Checklist";
-import TimelineView from "./Timeline";
 import EngineBar, { EngineLayer } from "./EngineBar";
 import WikiStatusBoard from "./WikiStatusBoard";
 import LlmPicker from "./LlmPicker";
-import { SOLUTIONS, solution, solutionOf, type SolutionCode } from "./solutions";
+import { VISIBLE_SOLUTIONS, solution, solutionOf, type SolutionCode, type SolutionMenu } from "./solutions";
+import {
+  NgAdmin, NgDocView, NgForecast, NgGov, NgInsights,
+  NgKnowledgeDb, NgMonitor, NgSection,
+} from "./NanoGrid";
 
 type Route =
   | { kind: "home" }
@@ -48,14 +48,91 @@ type Route =
   | { kind: "kb"; tab: KbTab }
   | { kind: "wiki"; tab: WikiTab }
   | { kind: "admin"; tab: AdminTab }
-  | { kind: "checklist" }
-  | { kind: "timeline" }
+  | { kind: "ng-monitor"; tab: "energy" | "ev" | "events" }
+  | { kind: "ng-forecast" }
+  | { kind: "ng-knowledge" }
+  | { kind: "ng-insights" }
+  | { kind: "ng-admin" }
+  | { kind: "ng-gov" }
+  | { kind: "ng-doc"; id: string }
   | { kind: "engines" };
+
+/** 나노그리드 화면의 현재 경로 (NgSection 활성 표시용). 다른 솔루션이면 "". */
+function ngRoutePath(route: Route): string {
+  switch (route.kind) {
+    case "ng-monitor":
+      return route.tab === "energy" ? "/ng/monitor" : `/ng/monitor/${route.tab}`;
+    case "ng-forecast": return "/ng/forecast";
+    case "ng-knowledge": return "/ng/knowledge";
+    case "ng-insights": return "/ng/insights";
+    case "ng-admin": return "/ng/admin";
+    case "ng-gov": return "/ng/gov";
+    case "ng-doc": return `/ng/doc/${route.id}`;
+    default: return "";
+  }
+}
+
+/** 사이드바 메뉴가 지금 화면을 가리키는가.
+ *
+ *  경로만 보면 한 화면의 탭을 각각 메뉴로 낸 경우(`/kb` 와 `/kb/checklist`)에
+ *  둘 다 활성으로 보인다. 메뉴가 맡는 탭이 지정돼 있으면 탭까지 맞춰 본다. */
+/** 사이드바 메뉴에 붙일 상태 칩.
+ *
+ *  가이드 02 — 메뉴를 '기능 이름 목록' 이 아니라 '지금 어디까지 왔는가' 로 읽히게
+ *  한다. 색만으로 말하지 않도록(가이드 04 접근성) 아이콘과 글자를 함께 낸다. */
+type MenuStatus = { tone: "ok" | "review" | "idle"; text: string };
+
+function useMenuStatus(): Record<string, MenuStatus | undefined> {
+  const [health, setHealth] = useState<WikiHealth | null>(null);
+  const [checklists, setChecklists] = useState<number | null>(null);
+
+  useEffect(() => {
+    api.wiki.health().then(setHealth).catch(() => setHealth(null));
+    api.audit.checklists().then((r) => setChecklists(r.checklists.length)).catch(() => setChecklists(null));
+  }, []);
+
+  if (!health) return {};
+  const pages = health.store.pages;
+  const unverified = pages - health.store.numeric_verified;
+  const drafts = health.store.by_status.draft ?? 0;
+
+  return {
+    wiki: { tone: pages > 0 ? "ok" : "idle", text: `${pages}장` },
+    review: drafts > 0
+      ? { tone: "review", text: `${drafts}건 대기` }
+      : { tone: "ok", text: "승인 완료" },
+    checklist: checklists === null
+      ? undefined
+      : checklists > 0
+        ? { tone: "ok", text: `${checklists}건` }
+        : { tone: "idle", text: "없음" },
+    // 검산 불일치는 위키 메뉴가 아니라 관리자에서 처리한다 — 여기 두면 두 곳이 같은
+    // 숫자를 다르게 말한다.
+    ...(unverified > 0 ? {} : {}),
+  };
+}
+
+function menuActive(m: SolutionMenu, route: Route): boolean {
+  if (route.kind !== m.match.slice(1)) return false;
+  if (!m.tabs) return true;
+  const tab = (route as { tab?: string }).tab;
+  return tab !== undefined && m.tabs.includes(tab);
+}
 
 function parseRoute(path: string): Route {
   if (path.startsWith("/p/")) return { kind: "program", id: path.slice(3) };
   if (path.startsWith("/t/")) return { kind: "table", name: decodeURIComponent(path.slice(3)) };
   if (path === "/tables") return { kind: "tables" };
+  // 나노그리드 데이터 지식화 (/ng/*)
+  if (path === "/ng/monitor") return { kind: "ng-monitor", tab: "energy" };
+  if (path === "/ng/monitor/ev") return { kind: "ng-monitor", tab: "ev" };
+  if (path === "/ng/monitor/events") return { kind: "ng-monitor", tab: "events" };
+  if (path === "/ng/forecast") return { kind: "ng-forecast" };
+  if (path === "/ng/knowledge") return { kind: "ng-knowledge" };
+  if (path === "/ng/insights") return { kind: "ng-insights" };
+  if (path === "/ng/admin") return { kind: "ng-admin" };
+  if (path === "/ng/gov") return { kind: "ng-gov" };
+  if (path.startsWith("/ng/doc/")) return { kind: "ng-doc", id: path.slice(8) };
   if (path.startsWith("/reg")) {
     const tab = path.slice(5) as RegTab;
     return { kind: "reg", tab: REG_TABS.includes(tab) ? tab : "assess" };
@@ -74,8 +151,6 @@ function parseRoute(path: string): Route {
     const tab = path.slice(7) as AdminTab;
     return { kind: "admin", tab: ADMIN_TABS.includes(tab) ? tab : "upload" };
   }
-  if (path.startsWith("/checklist")) return { kind: "checklist" };
-  if (path.startsWith("/timeline")) return { kind: "timeline" };
   // 엔진 레이어는 어느 솔루션에도 속하지 않는다 — 둘이 공유하는 바닥이다.
   if (path === "/engines") return { kind: "engines" };
   return { kind: "home" };
@@ -83,6 +158,7 @@ function parseRoute(path: string): Route {
 
 export default function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute(location.pathname));
+  const menuStatus = useMenuStatus();
   const [meta, setMeta] = useState<Meta | null>(null);
   const [tree, setTree] = useState<TreeLayer[]>([]);
   const [query, setQuery] = useState("");
@@ -246,11 +322,9 @@ export default function App() {
         <aside className="sidebar">
           <div className="brand-row">
             <div className="brand" onClick={() => navigate("/")}>
-              <span className="brand-mark">LW</span>
+              <img src="/gng-logo.png" alt="GnG" className="brand-logo" />
               <div>
-                <div className="brand-title" title={meta?.project ?? ""}>
-                  {t("brandName")}
-                </div>
+                <div className="brand-title">{meta?.project ?? "LLMWiki"}</div>
                 <div className="brand-sub">
                   {t("brandSub", {
                     programs: meta?.counts.programs ?? 0,
@@ -267,7 +341,7 @@ export default function App() {
               한 사이드바에 여섯 개를 늘어놓으면 '테이블 목록' 옆에 '위키 관리자'가
               붙어, 처음 보는 사람은 이게 한 흐름인 줄 안다. */}
           <div className="solution-switch">
-            {SOLUTIONS.map((sol) => (
+            {VISIBLE_SOLUTIONS.map((sol) => (
               <button
                 key={sol.code}
                 className={`solution-tab ${activeSolution === sol.code ? "active" : ""}`}
@@ -329,21 +403,42 @@ export default function App() {
                 </button>
               </div>
             </>
+          ) : activeSolution === "nanogrid" ? (
+            <>
+              {/* 나노그리드 데이터 지식화 — 그룹형 메뉴(운영/지식DB/AI-Gov)와
+                  세부 메뉴는 NgSection 이 그린다. */}
+              <NgSection activePath={ngRoutePath(route)} onPick={navigate} mode="data" />
+              <NgSection activePath={ngRoutePath(route)} onPick={navigate} mode="source" />
+            </>
           ) : (
             <>
               {/* 보고서 지식화는 프로젝트 단위가 아니다 — 업종과 사업장이 분리 축이라
                   좌측 트리(소스 분석)와 성격이 다르다. */}
               <nav className="solution-menu">
-                {solution("report").menus.map((m) => (
-                  <button
-                    key={m.path}
-                    className={`solution-item ${route.kind === m.match.slice(1) ? "active" : ""}`}
-                    onClick={() => navigate(m.path)}
-                  >
-                    <span className="solution-item-label">{t(m.labelKey)}</span>
-                    <span className="solution-item-desc">{t(m.descKey)}</span>
-                  </button>
-                ))}
+                {solution("report").menus.map((m) => {
+                  const st = m.statusKey ? menuStatus[m.statusKey] : undefined;
+                  return (
+                    <button
+                      key={m.path}
+                      className={`solution-item ${menuActive(m, route) ? "active" : ""}`}
+                      onClick={() => navigate(m.path)}
+                    >
+                      <span className="solution-item-head">
+                        {m.step !== undefined && (
+                          <span className="solution-step" aria-hidden>{m.step}</span>
+                        )}
+                        <span className="solution-item-label">{t(m.labelKey)}</span>
+                        {st && (
+                          <span className={`menu-chip ${st.tone}`}>
+                            <span aria-hidden>{st.tone === "ok" ? "●" : st.tone === "review" ? "▲" : "○"}</span>
+                            {st.text}
+                          </span>
+                        )}
+                      </span>
+                      <span className="solution-item-desc">{t(m.descKey)}</span>
+                    </button>
+                  );
+                })}
               </nav>
 
               {/* 사내/외부 LLM 선택은 화면 하나가 아니라 **솔루션 전체**에 걸린다.
@@ -389,7 +484,6 @@ export default function App() {
           )}
           {route.kind === "kb" && (
             <KnowledgeBase
-              onNavigate={navigate}
               tab={route.tab}
               onTab={(tab) => navigate(tab === "analyze" ? "/kb" : `/kb/${tab}`)}
             />
@@ -402,14 +496,18 @@ export default function App() {
           )}
           {route.kind === "admin" && (
             <WikiAdmin
-              onNavigate={navigate}
               tab={route.tab}
               onTab={(tab) => navigate(tab === "upload" ? "/admin" : `/admin/${tab}`)}
             />
           )}
-          {route.kind === "checklist" && <ChecklistView />}
-          {route.kind === "timeline" && <TimelineView onNavigate={navigate} />}
           {route.kind === "engines" && <EngineLayer onNavigate={navigate} />}
+          {route.kind === "ng-monitor" && <NgMonitor tab={route.tab} onNavigate={navigate} />}
+          {route.kind === "ng-forecast" && <NgForecast />}
+          {route.kind === "ng-knowledge" && <NgKnowledgeDb />}
+          {route.kind === "ng-insights" && <NgInsights onNavigate={navigate} />}
+          {route.kind === "ng-admin" && <NgAdmin onNavigate={navigate} />}
+          {route.kind === "ng-gov" && <NgGov />}
+          {route.kind === "ng-doc" && <NgDocView id={route.id} onNavigate={navigate} />}
           {route.kind === "tables" && <TablesView onPick={navigate} />}
           {route.kind === "table" && (
             <TableView name={route.name} onPick={navigate} onOpenSource={openSource} />

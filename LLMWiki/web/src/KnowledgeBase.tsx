@@ -12,6 +12,7 @@ import {
   type KbStats,
 } from "./api";
 import { useLang, type StringKey } from "./i18n";
+import PageHeader from "./PageHeader";
 import { useLlmChoice } from "./llmChoice";
 import { useFileDrop } from "./useFileDrop";
 
@@ -69,11 +70,9 @@ const IMAGE_KIND_KEY: Record<string, StringKey> = {
 export default function KnowledgeBase({
   tab,
   onTab,
-  onNavigate,
 }: {
   tab: KbTab;
   onTab: (t: KbTab) => void;
-  onNavigate: (path: string) => void;
 }) {
   const { t } = useLang();
   const [health, setHealth] = useState<KbHealth | null>(null);
@@ -120,13 +119,27 @@ export default function KnowledgeBase({
 
   return (
     <div className="page kb">
-      <h1>{t("kbTitle")}</h1>
-      <p className="lede">{t("kbLede")}</p>
-
-      {/* AI기본법 제31조제1항 — 사전 고지. 결과가 있든 없든 상시 노출한다. */}
-      <div className="banner warn kb-notice">
-        {t("kbPriorNotice")} <span className="muted small">{t("kbPriorNoticeLaw")}</span>
-      </div>
+      {/* 가이드 03 — 설명을 먼저 깔지 않고 '요약 상태 → 대표 행동' 을 먼저 낸다.
+          AI기본법 제31조제1항 고지는 없애지 않고 접는다. */}
+      <PageHeader
+        title={t("kbTitle")}
+        lede={t("kbLede")}
+        stats={[
+          { label: "적재 문서", value: health?.store.documents ?? "—", tone: (health?.store.documents ?? 0) > 0 ? "ok" : "idle" },
+          { label: "업종", value: sectors.length || "—", tone: "idle" },
+          {
+            label: "도달하는 곳",
+            value: destination ? destination.name : "—",
+            tone: destination?.cross_border ? "review" : "ok",
+          },
+        ]}
+        noticeSummary={t("kbPriorNoticeSummary")}
+        notice={
+          <>
+            {t("kbPriorNotice")} <span className="muted small">{t("kbPriorNoticeLaw")}</span>
+          </>
+        }
+      />
 
       {/* 이미지 OCR 만 빠진 상태는 고장이 아니다 — 그래서 빨간 배너가 아니라 주의로
           알린다. 올리고 나서 '아무것도 없음' 을 보면 파일이 빈 것인지 도구가 없는
@@ -144,15 +157,6 @@ export default function KnowledgeBase({
         </div>
       )}
 
-      {health && destination && (
-        <p className="muted small kb-dest">
-          {t("kbDestination")}: <strong>{destination.name}</strong>{" "}
-          {destination.cross_border ? t("kbDestOverseas") : t("kbDestDomestic")}
-          {destination.note ? ` — ${destination.note}` : ""}
-          {" · "}
-          {t("kbOntologyVersion", { version: health.ontology })}
-        </p>
-      )}
 
       <div className="reg-tabs" role="tablist">
         {KB_TABS.map((key) => (
@@ -186,7 +190,6 @@ export default function KnowledgeBase({
           accept={(health?.parser_ready.formats?.suffixes ?? [".pdf"]).join(",")}
           onError={setErr}
           onIngested={() => setRefresh((n) => n + 1)}
-          onNavigate={onNavigate}
         />
       )}
       {tab === "documents" && (
@@ -209,7 +212,6 @@ function AnalyzeTab({
   ready,
   onError,
   onIngested,
-  onNavigate,
 }: {
   sectors: KbSector[];
   destinations: KbDestination[];
@@ -219,7 +221,6 @@ function AnalyzeTab({
   ready: boolean;
   onError: (e: string | null) => void;
   onIngested: () => void;
-  onNavigate: (path: string) => void;
 }) {
   const { t } = useLang();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -345,17 +346,6 @@ function AnalyzeTab({
           >
             {busy === "ingest" ? t("kbIngesting") : t("kbIngest")}
           </button>
-
-          {/* 적재는 지식 데이터베이스까지다. 위키 페이지는 관리자 화면에서 선다 —
-              두 단계인 줄 모르고 여기서 끝내는 사고가 반복돼 길을 상시 열어 둔다.
-              적재를 마친 직후에는 강조해 다음 걸음이 눈에 띄게 한다. */}
-          <button
-            className={`btn link-step ${result?.stored?.stored ? "ready" : ""}`}
-            onClick={() => onNavigate("/admin")}
-            title={t("kbGoAdminHint")}
-          >
-            {t("kbGoAdmin")}
-          </button>
         </div>
       </div>
       <p className="muted small">{t("kbAnalyzeNote")}</p>
@@ -365,19 +355,6 @@ function AnalyzeTab({
           <Summary result={result} />
           <GateBanner result={result} />
           {result.stored && <StoredBanner result={result} />}
-          {/* 적재만 하고 끝내는 사람이 많다 — KB 에 들어간 것과 위키 페이지가 선
-              것은 다르다. 그래서 다음 걸음을 화면이 먼저 말한다. */}
-          {result.stored?.stored && (
-            <div className="banner next-step">
-              <div>
-                <strong>{t("kbNextTitle")}</strong>
-                <p className="muted small">{t("kbNextDesc")}</p>
-              </div>
-              <button className="primary" onClick={() => onNavigate("/admin")}>
-                {t("kbGoAdmin")}
-              </button>
-            </div>
-          )}
 
           <div className="reg-tabs kb-detail-tabs" role="tablist">
             {DETAIL_TABS.map((key) => (

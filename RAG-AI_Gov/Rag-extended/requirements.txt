@@ -1,0 +1,63 @@
+# ──────────────────────────────────────────────
+# RAG_search — Rag-extended requirements
+# Stack: Exo 1.0 + Qdrant + BGE-M3 + CrewAI
+# [REMOVED] xai-sdk (replaced by openai)
+# ──────────────────────────────────────────────
+
+# Web framework
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+
+# Database (SQLModel + async SQLite)
+sqlmodel
+aiosqlite
+
+# Auth
+python-jose[cryptography]
+bcrypt
+passlib[bcrypt]
+
+# HTTP
+httpx
+
+# ──────────────────────────────────────────────
+# AI / Vector
+# ──────────────────────────────────────────────
+
+# LLM client (OpenAI-compatible → Exo 1.0 + Grok fallback)
+openai>=1.12.0
+
+# Hybrid fallback: Claude / Anthropic (Fallback 2, optional)
+anthropic>=0.28.0
+
+# 경량 임베딩 (ONNX/CPU) — 저사양 서버에서 Ollama+BGE-M3 대체
+# EMBED_PROVIDER=ollama 로 두면 설치하지 않아도 됩니다.
+fastembed>=0.4.0
+
+# Vector DB
+# 1.12 에서 .search() 가 제거되고 query_points() 로 대체됨 → rag.py 가 신 API 사용
+qdrant-client>=1.12
+
+# Agent framework
+crewai>=0.28.0
+
+# Document parsing
+PyPDF2>=3.0.0
+python-docx
+
+# ──────────────────────────────────────────────
+# Utils
+# ──────────────────────────────────────────────
+cachetools
+python-dotenv
+
+# Testing
+pytest
+pytest-asyncio
+httpx  # also used for testing
+
+# 지식 데이터베이스 — 4채널 문서 분해
+pdfplumber
+openpyxl
