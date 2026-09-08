@@ -7,6 +7,7 @@ import { DOCUMENTS, type DocumentItem } from "@/data/documents";
 import { diagnosesApi, inquiriesApi, solarApi, wikiApi } from "@/lib/platform";
 import { useMember } from "@/hooks/useMember";
 import { usePageMeta } from "@/lib/use-page-meta";
+import { WorkProcessIntro } from "@/components/work/WorkProcessIntro";
 
 /** 임직원 대시보드 — 처리 대기 업무 + 지식 검색 + 기존 자료 아카이브 통합검색. */
 export default function WorkHubPage() {
@@ -47,6 +48,8 @@ export default function WorkHubPage() {
             <Mail size={16} /> 회사 메일
           </a>
         </header>
+
+        <WorkProcessIntro />
 
         <div className="work-stat-grid">
           <Link className="work-stat" to="/work/diagnosis">
