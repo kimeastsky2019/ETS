@@ -17,6 +17,7 @@ import MyPage from "./pages/account/MyPage";
 import SolarApplyPage from "./pages/solar/ApplyPage";
 import StaffLoginPage from "./pages/work/StaffLoginPage";
 import WorkHubPage from "./pages/work/WorkHubPage";
+import OverviewPage from "@/pages/work/OverviewPage";
 import WikiListPage from "./pages/work/WikiListPage";
 import WikiDetailPage from "./pages/work/WikiDetailPage";
 import WikiEditorPage from "./pages/work/WikiEditorPage";
@@ -56,6 +57,7 @@ const App = () => (
           <Route path="/work/login" element={<StaffLoginPage />} />
           <Route path="/staff" element={<Navigate to="/work" replace />} />
           <Route path="/work" element={<RequireStaff><WorkHubPage /></RequireStaff>} />
+          <Route path="/work/overview" element={<RequireStaff><OverviewPage /></RequireStaff>} />
           <Route path="/work/diagnosis" element={<RequireStaff><DiagnosisListPage /></RequireStaff>} />
           <Route path="/work/diagnosis/:code" element={<RequireStaff><DiagnosisDetailPage /></RequireStaff>} />
           <Route path="/work/benchmark" element={<RequireStaff><BenchmarkPage /></RequireStaff>} />
