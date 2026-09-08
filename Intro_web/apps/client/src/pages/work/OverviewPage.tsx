@@ -1,4 +1,5 @@
-import { ArrowRight, ArrowUpRight, BookOpen, Search } from "lucide-react";
+import { Fragment } from "react";
+import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { WorkShell } from "@/pages/work/WorkShell";
 import { usePageMeta } from "@/lib/use-page-meta";
@@ -6,200 +7,294 @@ import { usePageMeta } from "@/lib/use-page-meta";
 /**
  * 작업 개요 — 진단 보고서가 누구 손을 거쳐 어떻게 완성되는지.
  *
- * 대시보드의 안내는 "내 차례가 언제인가" 만 짚는 요약이고, 이 화면은 그 근거다.
- * 새로 온 사람이 읽는 곳이라 단계마다 왜 그 순서인지까지 적는다.
+ * 디자인은 별도로 받은 개요도를 옮긴 것이다. 내보내기 산출물(고정 폭·export 속성)은
+ * 걷어냈고, 클래스는 전부 `.ovx` 아래로 스코프했다 — .wrap/.step/.tool/.footer 처럼
+ * 흔한 이름이라 스코프하지 않으면 사이트의 다른 화면 스타일과 부딪힌다.
+ *
  * 상세 기획은 llmwiki 저장소 `design/진단-사이클-기획.md`.
  */
 
-type Tone = "office" | "field" | "ai" | "lead";
-
-const STAGES: {
-  no: string; name: string; owner: string; tone: Tone;
-  lead: string; body: string[]; io: [string, string][];
-}[] = [
+const STEPS = [
   {
-    no: "01", name: "골격", owner: "사무실 작성자 + LLM", tone: "office",
-    lead: "기존 보고서와 위키에서 보고서의 큰 틀을 잡습니다.",
-    body: [
-      "LLM 은 찾아주는 역할입니다. “이 업종 이 규모에서 예전에 뭘 다뤘나”를 RAG 로 검색하고, 위키에서 재사용 가능한 개선안을 끌어옵니다.",
-      "골격 자체는 사람이 정합니다. 무엇을 다루고 무엇을 뺄지는 수주 범위와 고객 사정이 걸린 판단이라 AI 가 알 수 없습니다.",
-    ],
-    io: [["입력", "과거 보고서(RAG 검색), 위키 사업장·설비·개선안"], ["출력", "목차, 다룰 설비, ECM 후보, 필요한 실측 항목"]],
+    no: "01", role: "사무실 작성자 + LLM", name: "골격",
+    lead: "보고서의 큰 틀과 체크리스트를 결정합니다.",
+    items: ["과거 보고서·RAG 검색으로 유사 사례 확인", "수주 범위와 고객 상황을 사람이 판단", "위키의 재사용 가능 개선안 연결"],
+    out: "진단 목차 + 체크리스트",
   },
   {
-    no: "02", name: "현장", owner: "현장 경력자", tone: "field",
-    lead: "체크리스트로 판정과 실측값을 올립니다.",
-    body: [
-      "경력자의 시간은 비쌉니다. 현장에서 요구할 것은 판정과 숫자뿐이어야 하고, 문장을 쓰게 하면 안 됩니다.",
-    ],
-    io: [["입력", "01 의 골격에서 파생된 체크리스트"], ["출력", "해당/비해당 판정, 실측값, 현장 사진·메모"]],
+    no: "02", role: "현장 경력자", name: "현장",
+    lead: "판정과 실측값만 빠르게 올립니다.",
+    items: ["설비 상태를 체크리스트 기준으로 판정", "필요한 계측값·사진·운전 조건 입력", "현장 경력자의 시간을 문서 작성에서 분리"],
+    out: "판정값 + 실측 데이터",
   },
   {
-    no: "03", name: "채움", owner: "AI", tone: "ai",
-    lead: "시계열을 모으고 본문 디테일을 채웁니다.",
-    body: [
-      "시계열 — 같은 사업장·같은 설비가 해가 바뀌며 어떤 값을 보였는지 모읍니다. “작년 공기비 1.3, 올해 1.5” 같은 변화는 기억으로 잡기 어렵습니다.",
-      "디테일 — 골격의 절마다 실측값과 위키 자산을 엮어 본문을 만듭니다. 실측값이 없으면 [미측정] 으로 두고 넘어갑니다.",
-    ],
-    io: [["입력", "02 의 실측값 + 위키 개선안·지표·법규 + 01 의 골격"], ["출력", "절별 본문 초안 + 시계열"]],
+    no: "03", role: "AI", name: "채움",
+    lead: "시계열과 본문 근거를 구조적으로 채웁니다.",
+    items: ["같은 설비의 연도별 변화와 이력 수집", "실측값과 위키 자산을 문단별로 조합", "값이 없는 항목은 [미측정] 상태로 보존"],
+    out: "근거 연결 본문 초안",
   },
   {
-    no: "04", name: "정리", owner: "사무실 작성자", tone: "office",
-    lead: "제출 형식에 맞춰 다듬습니다.",
-    body: [
-      "AI 초안은 내용이 맞아도 형식이 어긋납니다. 고객사 양식, 절 번호, 표 형식, 문체는 사람이 맞춥니다.",
-      "편집 중에 각 문장의 근거를 즉시 볼 수 있어야 합니다. 근거를 못 보면 고치다가 틀린 문장을 만듭니다.",
-    ],
-    io: [["입력", "03 의 초안"], ["출력", "제출 형식에 맞춘 보고서"]],
+    no: "04", role: "사무실 작성자", name: "정리",
+    lead: "제출 형식에 맞춰 검토 가능한 보고서로 다듬습니다.",
+    items: ["고객사 양식·절 번호·표 형식 정렬", "근거를 보며 문체와 표현을 편집", "AI 초안의 형식 오류를 사람이 조정"],
+    out: "제출용 보고서 초안",
   },
   {
-    no: "05", name: "승인", owner: "현장 책임자", tone: "lead",
-    lead: "검증하고 확정합니다. 위키 자산이 됩니다.",
-    body: [
-      "승인은 되돌릴 수 없는 지점입니다. 승인 전까지 이 보고서는 다른 문서가 인용할 수 없고, 승인 후에는 팀의 공식 견해가 되어 다음 진단의 자산이 됩니다.",
-    ],
-    io: [["입력", "04 의 정리본"], ["출력", "확정 보고서 + 위키 자산 승격"]],
+    no: "05", role: "현장 책임자", name: "승인",
+    lead: "검증 후 확정하여 조직의 공식 자산으로 만듭니다.",
+    items: ["결론·수치·현장 사실의 최종 검증", "승인 전에는 다른 문서가 인용하지 않음", "승인 후에는 다음 진단에 재사용"],
+    out: "승인된 위키 자산",
   },
 ];
 
-/** 경계를 흐리면 보고서 전체의 신뢰가 한 번에 무너진다. */
-const BOUNDARY: { work: string; who: string; tone: Tone | "code"; why: string }[] = [
-  { work: "자료 검색·요약", who: "AI", tone: "ai", why: "사람보다 빠짐없이 훑습니다" },
-  { work: "시계열 집계", who: "AI", tone: "ai", why: "사람의 기억으로는 안 잡힙니다" },
-  { work: "문장 작성", who: "AI", tone: "ai", why: "초안 수준이면 충분합니다" },
-  { work: "계산", who: "코드", tone: "code", why: "같은 입력에 같은 숫자가 나와야 합니다" },
-  { work: "해당/비해당 판정", who: "현장 경력자", tone: "field", why: "눈으로 봐야 압니다" },
-  { work: "다룰 범위 결정", who: "사무실 작성자", tone: "office", why: "수주 범위·고객 사정이 걸립니다" },
-  { work: "승인", who: "현장 책임자", tone: "lead", why: "책임이 따릅니다" },
+const MATRIX: [string, string, string, string][] = [
+  ["판단", "현장 맥락\n범위 결정", "판단 근거\n탐색 지원", "—"],
+  ["정리", "양식·문체\n최종 편집", "초안 구성\n정보 연결", "표·단위\n일관성 점검"],
+  ["계산", "입력값 확인\n결과 해석", "결과 설명\n문장화", "절감량·회수기간\n재현 계산"],
+  ["자산화", "승인·책임", "위키 연결\n재사용 제안", "근거·버전\n추적"],
 ];
 
-const SERVICES = [
+/** 도구는 눌러서 바로 들어갈 수 있어야 한다 — 원본 개요도에서는 설명 카드였다. */
+const TOOLS = [
   {
-    href: "https://work.ets0404.com/", icon: BookOpen, name: "LLM Wiki",
-    host: "work.ets0404.com", lead: "위키 · 체크리스트",
-    desc: "설비와 개선안(ECM)을 문서로 쌓고, 현장에 들고 나갈 체크리스트를 만듭니다.",
-    stages: "02 현장 · 03 채움 · 05 승인",
+    href: "https://work.ets0404.com/", name: "LLM Wiki", type: "위키 · 체크리스트",
+    desc: "설비와 개선안(ECM)을 문서로 축적하고, 현장에 들고 나갈 체크리스트를 만듭니다.",
+    stage: "활용 단계 · 02 현장 · 03 채움 · 05 승인", host: "work.ets0404.com",
+    icon: (
+      <svg viewBox="0 0 36 36" role="img" aria-hidden="true">
+        <path d="M7 7h15l7 7v15H7z" fill="none" stroke="#187357" strokeWidth="2.4" strokeLinejoin="round" />
+        <path d="M22 7v8h8M12 21h12M12 26h8" fill="none" stroke="#187357" strokeWidth="2.4" strokeLinecap="round" />
+      </svg>
+    ),
   },
   {
-    href: "https://rag.ets0404.com/", icon: Search, name: "RAG 검색",
-    host: "rag.ets0404.com", lead: "자료 검색 · 분석",
-    desc: "과거 보고서와 원본 자료를 검색하고 질문해 초기 파악을 합니다.",
-    stages: "01 골격",
+    href: "https://rag.ets0404.com/", name: "RAG 검색", type: "자료 검색 · 초기 분석",
+    desc: "과거 보고서와 원본 자료를 검색하고 질문해, 진단의 골격을 세우기 전 필요한 맥락을 빠르게 파악합니다.",
+    stage: "활용 단계 · 01 골격", host: "rag.ets0404.com",
+    icon: (
+      <svg viewBox="0 0 36 36" role="img" aria-hidden="true">
+        <circle cx="16" cy="16" r="8.5" fill="none" stroke="#146AA0" strokeWidth="2.6" />
+        <path d="M22 22l7 7M13 16h6M16 13v6" fill="none" stroke="#146AA0" strokeWidth="2.6" strokeLinecap="round" />
+      </svg>
+    ),
   },
 ];
 
 export default function OverviewPage() {
-  usePageMeta("작업 개요", "진단 보고서 작업 프로세스 — 역할 분담과 도구");
+  usePageMeta("작업 개요", "에너지진단 보고서 제작 프로세스 — 사람·AI·코드의 역할 분담");
 
   return (
     <WorkShell>
-      <div className="work-container">
-        <header className="work-page-head">
-          <div>
-            <span className="eyebrow">OVERVIEW</span>
-            <h1>진단 보고서는 이렇게 만듭니다</h1>
-            <p>사람은 판단하고, AI는 채우고, 계산은 코드가 합니다. 한 건이 다섯 단계를 거칩니다.</p>
-          </div>
-        </header>
+      <div className="ovx">
+        {/* ── 히어로 ─────────────────────────────── */}
+        <section className="ovx-wrap ovx-hero" aria-labelledby="ovx-title">
+          <div className="ovx-hero-grid">
+            <div>
+              <p className="ovx-eyebrow">REPORT MAKING SYSTEM</p>
+              <h1 id="ovx-title">진단 보고서는<br />이렇게 만듭니다</h1>
+              <p className="ovx-lead">
+                사람은 판단하고, AI는 자료를 채우고, 코드는 수치를 계산합니다.
+                한 건의 에너지진단이 신뢰도 높은 보고서 자산으로 완성되는 다섯 단계입니다.
+              </p>
+              <div className="ovx-principles" aria-label="작업 원칙">
+                <span className="ovx-pill">사람의 현장 판단</span>
+                <span className="ovx-pill">AI 기반 지식 재활용</span>
+                <span className="ovx-pill">코드 기반 수치 검산</span>
+              </div>
+            </div>
 
-        <section className="work-panel">
-          <div className="ov-order">
-            <strong>골격이 체크리스트를 결정합니다.</strong> 무엇을 보고서에 쓸지 정해야 현장에서
-            무엇을 확인할지가 정해집니다. 반대로 하면 재방문이 생깁니다 — 쓰려고 보니 그 값이 없는 상황입니다.
+            <div className="ovx-art" aria-label="사람, AI, 코드가 연결된 진단 보고서 제작 흐름">
+              <svg viewBox="0 0 620 420" role="img" aria-labelledby="ovx-svg-t ovx-svg-d">
+                <title id="ovx-svg-t">에너지진단 보고서 제작 원리</title>
+                <desc id="ovx-svg-d">현장 판단, AI 지식 탐색, 코드 계산이 보고서로 모여 승인된 위키 자산으로 순환하는 구조도</desc>
+                <defs>
+                  <linearGradient id="ovx-flow" x1="0" x2="1">
+                    <stop stopColor="#0090FF" /><stop offset="1" stopColor="#29A383" />
+                  </linearGradient>
+                  <filter id="ovx-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="8" stdDeviation="8" floodColor="#1C5180" floodOpacity=".13" />
+                  </filter>
+                </defs>
+                <path d="M145 118 C220 78 260 83 309 137" fill="none" stroke="url(#ovx-flow)" strokeWidth="4" strokeLinecap="round" />
+                <path d="M470 118 C396 78 354 83 310 137" fill="none" stroke="#29A383" strokeWidth="4" strokeLinecap="round" />
+                <path d="M168 292 C236 347 394 347 453 292" fill="none" stroke="#F5A524" strokeWidth="4" strokeLinecap="round" strokeDasharray="8 9" />
+                <path d="M310 212 L310 287" fill="none" stroke="#0090FF" strokeWidth="4" strokeLinecap="round" />
+                <g filter="url(#ovx-shadow)">
+                  <rect x="53" y="65" width="140" height="104" rx="20" fill="#FFFFFF" stroke="#BFE2FA" strokeWidth="2" />
+                  <rect x="427" y="65" width="140" height="104" rx="20" fill="#FFFFFF" stroke="#BCE7D8" strokeWidth="2" />
+                  <rect x="214" y="130" width="192" height="112" rx="25" fill="#0090FF" />
+                  <rect x="230" y="281" width="160" height="94" rx="20" fill="#1C2024" />
+                </g>
+                <g fill="none" stroke="#0090FF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="93" cy="99" r="12" />
+                  <path d="M75 142c4-18 32-18 36 0M132 101h32M132 119h25M132 137h32" />
+                </g>
+                <g fill="none" stroke="#29A383" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M469 95h26l12 12v33h-38z" /><path d="M495 95v14h14M479 122h18M479 137h18" />
+                </g>
+                <g fill="none" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="262" y="158" width="42" height="32" rx="7" />
+                  <rect x="320" y="158" width="42" height="32" rx="7" />
+                  <path d="M283 190v19M341 190v19M264 210h96" />
+                </g>
+                <g fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M256 323h58M256 342h34M337 318l10 10 20-24" />
+                </g>
+                <text x="78" y="157" fill="#146AA0" fontSize="14" fontWeight="800">현장 판단</text>
+                <text x="453" y="157" fill="#187357" fontSize="14" fontWeight="800">지식 자산</text>
+                <text x="265" y="221" fill="#FFFFFF" fontSize="18" fontWeight="850">AI 조합 · 보완</text>
+                <text x="254" y="362" fill="#FFFFFF" fontSize="15" fontWeight="800">검산 가능한 보고서</text>
+                <text x="260" y="400" fill="#8E5A00" fontSize="13" fontWeight="800">승인 후, 다음 진단의 공식 자산으로 순환</text>
+              </svg>
+              <div className="ovx-legend" aria-label="구조도 범례">
+                <div className="ovx-legend-item"><span className="ovx-dot" style={{ background: "#0090FF" }} />사람의 판단</div>
+                <div className="ovx-legend-item"><span className="ovx-dot" style={{ background: "#29A383" }} />AI·위키 자산</div>
+                <div className="ovx-legend-item"><span className="ovx-dot" style={{ background: "#F5A524" }} />검산·승인</div>
+              </div>
+            </div>
           </div>
+        </section>
 
-          <ol className="ov-stages">
-            {STAGES.map((s) => (
-              <li key={s.no} className={`ov-stage tone-${s.tone}`}>
-                <div className="ov-stage-head">
-                  <span className="ov-no">{s.no}</span>
-                  <h2>{s.name}</h2>
-                  <span className="ov-owner">{s.owner}</span>
-                </div>
-                <div className="ov-stage-grid">
-                  <div className="ov-stage-body">
-                    <p className="ov-lead">{s.lead}</p>
-                    {s.body.map((p) => <p key={p}>{p}</p>)}
-                  </div>
-                  <dl className="ov-io">
-                    {s.io.map(([k, v]) => (
-                      <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
-                    ))}
-                  </dl>
-                </div>
-              </li>
+        {/* ── 5단계 ─────────────────────────────── */}
+        <section className="ovx-wrap ovx-process" aria-labelledby="ovx-process-t">
+          <div className="ovx-head">
+            <div>
+              <p className="ovx-eyebrow">5-STEP WORKFLOW</p>
+              <h2 id="ovx-process-t">현장 지식이 보고서가 되는 여정</h2>
+            </div>
+            <p className="ovx-note">
+              각 단계는 책임 주체가 다릅니다. 현장 경험이 필요한 판단은 사람이,
+              반복 수집은 AI가, 숫자 검증은 코드가 담당합니다.
+            </p>
+          </div>
+          <div className="ovx-track">
+            {STEPS.map((s) => (
+              <article className="ovx-step" key={s.no}>
+                <div className="ovx-step-no">{s.no}</div>
+                <span className="ovx-step-role">{s.role}</span>
+                <h3>{s.name}</h3>
+                <p className="ovx-step-lead">{s.lead}</p>
+                <ul>{s.items.map((i) => <li key={i}>{i}</li>)}</ul>
+                <div className="ovx-step-foot">OUTPUT · {s.out}</div>
+              </article>
             ))}
-          </ol>
+          </div>
         </section>
 
-        <section className="work-panel">
-          <div className="work-panel-head">
-            <div>
-              <span className="eyebrow">BOUNDARY</span>
-              <h2>사람과 AI의 경계</h2>
-              <p>무엇을 AI에 맡기지 <b>않을지</b>를 먼저 못 박아야 합니다.</p>
+        {/* ── 책임 경계 ─────────────────────────── */}
+        <section className="ovx-role" aria-labelledby="ovx-boundary-t">
+          <div className="ovx-wrap ovx-role-grid">
+            <div className="ovx-boundary">
+              <p className="ovx-eyebrow">BOUNDARY MAP</p>
+              <h2 id="ovx-boundary-t">사람·AI·코드의<br />책임 경계를 명확하게</h2>
+              <p className="ovx-boundary-lead">
+                무엇을 AI에 맡길지보다, 무엇을 AI에 맡기지 않을지를 먼저 정합니다.
+                현장 판단과 책임은 사람이 갖고, AI는 근거를 찾고 조합하며,
+                계산은 재현 가능한 코드로 고정합니다.
+              </p>
+              <div className="ovx-resp">
+                <div className="ovx-resp-col ovx-resp-human">
+                  <p className="ovx-resp-title"><span className="ovx-resp-icon" aria-hidden="true">H</span>사람이 결정하는 일</p>
+                  <ul>
+                    <li>진단 범위와 보고서 골격</li>
+                    <li>설비 상태의 현장 판정</li>
+                    <li>고객사 형식과 표현의 최종 편집</li>
+                    <li>결론과 권고안의 승인</li>
+                  </ul>
+                </div>
+                <div className="ovx-resp-col ovx-resp-ai">
+                  <p className="ovx-resp-title"><span className="ovx-resp-icon" aria-hidden="true">AI</span>AI가 보완하는 일</p>
+                  <ul>
+                    <li>과거 문서와 위키 자료 탐색</li>
+                    <li>시계열·실측값·근거의 연결</li>
+                    <li>초안 문단과 설명의 구조화</li>
+                    <li>미측정·누락 상태의 표시</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="ovx-code" aria-label="코드 역할 안내">
+                <span className="ovx-code-key">CODE</span>
+                <p>절감량·회수기간은 같은 입력에서 같은 결과가 나와야 합니다. 수치 계산은 코드가 담당하고, AI는 검증된 결과를 문장으로 옮깁니다.</p>
+              </div>
             </div>
-          </div>
-          <div className="ov-table-scroll">
-            <table className="ov-table">
-              <thead><tr><th>일</th><th>누가</th><th>왜</th></tr></thead>
-              <tbody>
-                {BOUNDARY.map((r) => (
-                  <tr key={r.work} className={r.tone === "ai" ? "" : "hard"}>
-                    <th>{r.work}</th>
-                    <td className={`ov-who tone-${r.tone}`}>{r.who}</td>
-                    <td>{r.why}</td>
-                  </tr>
+
+            <aside className="ovx-matrix" aria-labelledby="ovx-matrix-t">
+              <h3 id="ovx-matrix-t">작업별 책임 매트릭스</h3>
+              <p className="ovx-matrix-lead">
+                업무를 기능이 아니라 <strong>자료의 상태</strong>로 분리합니다.
+                이해·판단이 필요한 자료와, 재사용·검산이 필요한 자료는 처리 방식이 다릅니다.
+              </p>
+              <div className="ovx-matrix-grid" role="table" aria-label="사람 AI 코드 역할표">
+                <div className="ovx-mh" />
+                <div className="ovx-mh">사람</div>
+                <div className="ovx-mh">AI</div>
+                <div className="ovx-mh">코드</div>
+                {MATRIX.map(([label, human, ai, code]) => (
+                  <Fragment key={label}>
+                    <div className="ovx-ml" role="rowheader">{label}</div>
+                    <div className="ovx-c-human">{split(human)}</div>
+                    <div className="ovx-c-ai">{split(ai)}</div>
+                    <div className="ovx-c-code">{split(code)}</div>
+                  </Fragment>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </aside>
           </div>
-          <p className="ov-foot">
-            절감량·회수기간은 코드가 계산하고 AI는 결과를 문장으로 옮깁니다.
-            AI가 계산하면 같은 입력에 다른 숫자가 나올 수 있어 검산이 불가능합니다.
-            보고서의 숫자에는 <b>측정값 → 산식 → 결과</b>가 항상 따라다녀야 합니다.
-          </p>
         </section>
 
-        <section className="work-panel">
-          <div className="work-panel-head">
+        {/* ── 도구 ──────────────────────────────── */}
+        <section className="ovx-wrap ovx-tools" aria-labelledby="ovx-tools-t">
+          <div className="ovx-head">
             <div>
-              <span className="eyebrow">TOOLS</span>
-              <h2>어느 도구를 언제 쓰나</h2>
-              <p>경계는 기능이 아니라 자료의 상태로 긋습니다 — 아직 이해 중인가, 이미 이해해서 재사용할 것인가.</p>
+              <p className="ovx-eyebrow">TOOLS BY DATA STATE</p>
+              <h2 id="ovx-tools-t">어떤 도구를 언제 쓰나</h2>
             </div>
+            <p className="ovx-note">
+              도구 선택의 기준은 기능이 아니라 자료의 상태입니다.
+              아직 이해 중인 자료는 검색·분석하고, 승인된 지식은 위키·체크리스트로 재사용합니다.
+            </p>
           </div>
-          <div className="process-services">
-            {SERVICES.map((s) => {
-              const Icon = s.icon;
-              return (
-                <a key={s.host} className="process-service" href={s.href} target="_blank" rel="noreferrer">
-                  <div className="pv-top"><Icon size={22} /><ArrowUpRight size={18} /></div>
-                  <strong>{s.name}</strong>
-                  <span className="pv-lead">{s.lead}</span>
-                  <p>{s.desc}</p>
-                  <div className="pv-foot">
-                    <span className="pv-stages">{s.stages}</span>
-                    <span className="pv-host">{s.host}</span>
+          <div className="ovx-tool-grid">
+            {TOOLS.map((t) => (
+              <a className="ovx-tool" key={t.host} href={t.href} target="_blank" rel="noreferrer">
+                <div className="ovx-tool-symbol" aria-hidden="true">{t.icon}</div>
+                <div>
+                  <h3>{t.name}</h3>
+                  <span className="ovx-tool-type">{t.type}</span>
+                  <p>{t.desc}</p>
+                  <div className="ovx-tool-foot">
+                    <span className="ovx-tool-stage">{t.stage}</span>
+                    <span className="ovx-tool-host">{t.host} ↗</span>
                   </div>
-                </a>
-              );
-            })}
+                </div>
+              </a>
+            ))}
           </div>
-          <p className="process-note">두 서비스는 각각 별도 로그인이 필요합니다. 계정이 없으면 담당자에게 요청하세요.</p>
+          <p className="ovx-tool-note">두 서비스는 각각 별도 로그인이 필요합니다. 계정이 없으면 담당자에게 요청하세요.</p>
         </section>
 
-        <nav className="ov-next" aria-label="다음 단계">
-          <div className="ov-next-copy">
-            <span className="eyebrow">NEXT</span>
+        {/* ── 다음 단계 ─────────────────────────── */}
+        <nav className="ovx-wrap ovx-next" aria-label="다음 단계">
+          <div>
+            <p className="ovx-eyebrow">NEXT</p>
             <h2>오늘의 업무로</h2>
-            <p>처리할 진단 건과 고객 신청·문의가 대시보드에 모여 있습니다.</p>
+            <p className="ovx-next-lead">처리할 진단 건과 고객 신청·문의가 대시보드에 모여 있습니다.</p>
           </div>
-          <Link className="button primary ov-next-btn" to="/work">
-            대시보드로 이동 <ArrowRight size={17} />
-          </Link>
+          <Link className="ovx-next-btn" to="/work">대시보드로 이동 <ArrowRight size={17} /></Link>
         </nav>
+
+        <footer className="ovx-wrap ovx-foot">
+          에너지기술서비스 진단 프로세스 · 사람의 판단과 AI의 효율, 코드의 재현성을 하나의 작업 흐름으로 연결합니다.
+        </footer>
       </div>
     </WorkShell>
   );
+}
+
+/** 매트릭스 칸의 줄바꿈(\n)을 <br /> 로. 원본 개요도가 두 줄로 짜여 있다. */
+function split(text: string) {
+  const parts = text.split("\n");
+  return parts.map((p, i) => (
+    <Fragment key={p + i}>{i > 0 && <br />}{p}</Fragment>
+  ));
 }
