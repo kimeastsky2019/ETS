@@ -30,7 +30,7 @@ export default function StaffLoginPage() {
     retry: false
   });
 
-  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/work";
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/work/overview";
 
   if (isPending) {
     return <div className="guard-loading"><div className="guard-spinner" /><p>세션 확인 중…</p></div>;

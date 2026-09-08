@@ -5,8 +5,8 @@ import { IMAGES } from "@/assets/images";
 import { useMember } from "@/hooks/useMember";
 
 const workNav = [
-  { to: "/work", label: "대시보드", icon: LayoutDashboard, end: true },
   { to: "/work/overview", label: "개요", icon: Compass, end: false },
+  { to: "/work", label: "대시보드", icon: LayoutDashboard, end: true },
   { to: "/work/diagnosis", label: "진단", icon: Stethoscope, end: false },
   { to: "/work/wiki", label: "LLM Wiki", icon: BookOpen, end: false },
   { to: "/work/benchmark", label: "벤치마크", icon: BarChart3, end: false },

@@ -1,4 +1,5 @@
-import { ArrowUpRight, BookOpen, Search } from "lucide-react";
+import { ArrowRight, ArrowUpRight, BookOpen, Search } from "lucide-react";
+import { Link } from "react-router-dom";
 import { WorkShell } from "@/pages/work/WorkShell";
 import { usePageMeta } from "@/lib/use-page-meta";
 
@@ -187,6 +188,17 @@ export default function OverviewPage() {
           </div>
           <p className="process-note">두 서비스는 각각 별도 로그인이 필요합니다. 계정이 없으면 담당자에게 요청하세요.</p>
         </section>
+
+        <nav className="ov-next" aria-label="다음 단계">
+          <div className="ov-next-copy">
+            <span className="eyebrow">NEXT</span>
+            <h2>오늘의 업무로</h2>
+            <p>처리할 진단 건과 고객 신청·문의가 대시보드에 모여 있습니다.</p>
+          </div>
+          <Link className="button primary ov-next-btn" to="/work">
+            대시보드로 이동 <ArrowRight size={17} />
+          </Link>
+        </nav>
       </div>
     </WorkShell>
   );
